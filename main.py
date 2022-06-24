@@ -1,10 +1,12 @@
-from spreadbox import Box, wrap
+from spreadbox import Box, wrap, shared
 from spreadbox.network.utils import ip
 
 class MyBox(Box):
     def name(self) -> str : return 'MyBox'
     def on(self) -> bool: return True
     def overload(self) -> int: return 0
+    @shared()
+    def sum(x,y) -> None: return x+y
 
 @wrap()
 def factorial(x : int):
@@ -14,13 +16,13 @@ def factorial(x : int):
 
 def server():
     box = MyBox()
-    box2 = MyBox()
     box.serve(303, False)
-    box2.serve(304, False)
 
 def client():
-    available = Box.seek((ip()[-1],ip()[-1]), (303,304))
-    print(available.spread([factorial.make(3), factorial.make(5)]))
+    box = Box.get(ip()[-1], 303)
+    #box['factorial'] = factorial
+    print(box.call('sum', 2, 3))
+    #print(boxes.spread([factorial.make(3), factorial.make(5)]))
 
 if __name__ == "__main__":
     server()

@@ -3,13 +3,15 @@ from types import FunctionType, ModuleType
 from typing import Any, Dict, List, Tuple, Union
 import inspect
 
+def no_indent(src : str) -> str: return '\n'.join([s.lstrip() for s in src.split('\n')])
+
 class FunctionWrapper:
     __slots__ = ('fn','name','src','wrapname','libs','preparation')
 
     def __init__(self, fn : FunctionType, src : str = None, wrapname : str = "wrap", libs : set[str] = None) -> None:
         self.fn = fn
         self.name = fn.__name__
-        self.src = src or inspect.getsource(fn)
+        self.src = src or no_indent(inspect.getsource(fn)) #removes indentation, wrapped function are not holded in any scope
         self.wrapname = wrapname
         #TODO: Get all the requeriments by the library (modules of functions for example)
         self.libs = libs or set(map(lambda v:v.__name__, filter(lambda x: isinstance(x,ModuleType), fn.__globals__.values())))
@@ -53,7 +55,6 @@ def wrap():
         wrapper = FunctionWrapper(fn, wrapname=name)
         return wrapper
     return wrapped
-
 
 def arg_wrap(src : str = None, wrapname : str = 'wrap', libs : set[str] = None):
     def wrap():

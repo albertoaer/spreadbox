@@ -1,5 +1,5 @@
 from __future__ import annotations
-from abc import ABC, abstractmethod
+from abc import ABCMeta, abstractmethod
 from typing import Any, Callable, List, Set, Tuple, Union
 
 from spreadbox.environment.logger import Logger
@@ -10,7 +10,7 @@ from ..network.protocol import ISocket, protocol
 from ..network.client_manager import ClientManager
 from ..network.utils import netMap, ip
 
-class IBox(ABC):
+class IBox(metaclass=ABCMeta):
     @abstractmethod
     def name(self) -> str:
         pass
@@ -44,16 +44,32 @@ class IBox(ABC):
         if not isinstance(o, Box): return False
         return self.name() == o.name()
 
-class Box(IBox, ClientManager):
+def shared():
+    def shared_obj(obj : Any) -> Any: #Allows properties be accessed from the outside
+        obj.__is_shared__ = True
+        return obj
+    return shared_obj
+
+class MetaBox(ABCMeta):
+    def __call__(cls, *args, **kwargs):
+        #Includes all the shared elements into the shared methods dictionary
+        cls.shared_methods = {}
+        for id in dir(cls):
+            attr = getattr(cls, id)
+            if hasattr(attr, '__is_shared__') and attr.__is_shared__:
+                cls.shared_methods[id] = attr
+        return super().__call__(*args, **kwargs)
+
+class Box(IBox, ClientManager, metaclass=MetaBox):
     def __init__(self) -> None:
         self.connections : dict[str, ISocket] = {}
-        self.envGlobals : dict[str, Any] = {}
+        self.envGlobals : dict[str, Any] = self.shared_methods
         super().__init__("%s::%s" % (type(self).__name__, self.name()))
 
     def call(self, name, *args, **kwargs) -> Any:
         try:
             return self.envGlobals[name](*args, **kwargs)
-        except BaseException as e:
+        except Exception as e:
             return e
 
     def __setitem__(self, k: str, v: Any) -> None:
@@ -82,6 +98,11 @@ class Box(IBox, ClientManager):
             if not 'id' in query or not 'args' in query or not 'kwargs' in query: return self.logger.err("Wrong request")
             answer : Any = self.call(query['id'], *query['args'], **query['kwargs'])
             protocol().write(QueryMaker.call(query['id'], repr(answer)), sck)
+    
+    @staticmethod
+    def get(addr : str, port : int, timeout : float = 1) -> Union[RemoteBox, None]:
+        res = netMap([(addr, port)], timeout)
+        return RemoteBox(res[0]) if res else None
     
     @staticmethod
     def seek(addr : Union[str, Tuple[str]], port : Union[int, Tuple[int]], matchs_per_second : int = 1000) -> BoxGroup:
