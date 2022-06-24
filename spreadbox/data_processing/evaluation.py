@@ -7,7 +7,6 @@ from ..core.dependencies import DependencySolver
 def eval_fn(name, src, wrapname, libs, env : Tuple[dict, dict]) -> FunctionWrapper:
     env = dict(env[0])
     for lib in DependencySolver.fromlist(libs):
-        print(str(lib))
         exec(str(lib), env, env)
     if wrapname:
         env[wrapname] = arg_wrap(src=src, wrapname=wrapname)

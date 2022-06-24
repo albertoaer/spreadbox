@@ -4,8 +4,13 @@ from typing import Any, Dict, List, Tuple, Union
 from .dependencies import DependencySolver
 import inspect
 
-#def remove_first_indent(src : str) -> str:
-#    return '\n'.join([s.lstrip() for s in src.split('\n')])
+#Only valid for functions, it asumes first line is reference indentation
+def fn_correct_indent(fn_src : str) -> str:
+    lines = fn_src.split('\n')
+    if not lines: return fn_src
+    tabsize = len(lines[0]) - len(lines[0].lstrip())
+    if tabsize == 0: return fn_src
+    return '\n'.join([line[tabsize] for line in lines])
 
 class FunctionWrapper:
     __slots__ = ('fn','name','src','wrapname','libs','preparation')
@@ -13,8 +18,7 @@ class FunctionWrapper:
     def __init__(self, fn : FunctionType, src : str = None, wrapname : str = "wrap", libs : List[dict] = None) -> None:
         self.fn = fn
         self.name = fn.__name__
-        #TODO: Indents are broken
-        self.src = src or inspect.getsource(fn) #removes indentation, wrapped function are not holded in any scope
+        self.src = src or fn_correct_indent(inspect.getsource(fn)) #removes indentation, wrapped function are not holded in any scope
         self.wrapname = wrapname
         self.libs = libs or DependencySolver.solve(fn).format()
         self.preparation : Tuple[List,Dict] = None #arguments for a delegated call (args,kwargs)

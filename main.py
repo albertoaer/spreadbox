@@ -6,10 +6,10 @@ class MyBox(Box):
     def name(self) -> str : return 'MyBox'
     def on(self) -> bool: return True
     def overload(self) -> int: return 0
-    """ @shared(True)
+    @shared(True)
     def stored(self) -> None: return self.x
     @shared(True)
-    def sum(self,y) -> None: self.x+=y """
+    def sum(self,y) -> None: self.x+=y
 
 @wrap()
 def factorial(x : int):
@@ -24,10 +24,10 @@ def server():
 def client():
     box = Box.get(ip()[-1], 303)
     box['factorial'] = factorial
-    #box.call('sum', 2)
-    #box.call('sum', 3)
-    #print(box.call('stored'))
     print(box.call('factorial', 5))
+    box.call('sum', 2)
+    box.call('sum', 3)
+    print(box.call('stored'))
     #print(boxes.spread([factorial.make(3), factorial.make(5)]))
 
 if __name__ == "__main__":
