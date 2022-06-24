@@ -11,14 +11,14 @@ class TCPSocket(ISocket): #TCP Socket uses TCP connections
         self.role : SocketRole = SocketRole.Undefined
 
     def intoServer(self, port : int) -> None:
-        if self.role != SocketRole.Undefined: raise "Expecting unassigned socket"
+        if self.role != SocketRole.Undefined: raise Exception('Expecting unassigned socket')
         self.socket.bind((ip()[-1], port))
         self.port = port
         self.socket.listen(self.backlog)
         self.role = SocketRole.Server
 
     def intoConnection(self, addr : Address) -> None:
-        if self.role != SocketRole.Undefined: raise "Expecting unassigned socket"
+        if self.role != SocketRole.Undefined: raise Exception('Expecting unassigned socket')
         self.addr = addr
         self.socket.connect(addr)
         self.role = SocketRole.Client

@@ -42,7 +42,7 @@ class ClientManager(Stoppable):
 
     def serve(self, port : int, prevail : bool = True) -> None: #create a service that manage users
         if self.server != None:
-            raise "Already served"
+            raise Exception('Already served')
         self.server = protocol().createSocket()
         self.server.intoServer(port)
         #Thread configuration and execution

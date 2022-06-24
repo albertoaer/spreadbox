@@ -1,8 +1,7 @@
 from types import FunctionType
 from typing import Any, Tuple
-from .queries import QueryMaker, QueryReader
+from .queries import QueryMaker
 from ..core.function_wrapper import FunctionWrapper, arg_wrap
-from spreadbox.data_processing import queries
 
 def eval_fn(name, src, wrapname, env : Tuple[dict, dict]) -> FunctionWrapper:
     env = dict(env[0])
@@ -26,4 +25,4 @@ def get_value_query(data : Any) -> Tuple[str, QueryMaker]:
         return 'function', QueryMaker.function(data.name, repr(data), data.wrapname)
     elif not callable(data):
         return 'literal', QueryMaker.literal(repr(data))
-    else: raise "Not supported yet"
+    else: raise Exception("Not supported yet")
