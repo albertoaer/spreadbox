@@ -65,8 +65,8 @@ class QueryMaker:
         return {'id':id}
 
     @query('function', True)
-    def function_req(name : str, code : str) -> dict:
-        return {'id':name, 'value':code}
+    def function_req(name : str, code : str, wrapname : str = 'wrap') -> dict:
+        return {'id':name, 'value':code, 'wrapname':wrapname}
 
     @query('call', True)
     def call_req(name : str, *args, **kwargs) -> dict:

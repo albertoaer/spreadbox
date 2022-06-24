@@ -52,9 +52,9 @@ class Box(IBox, ClientManager):
         self.envGlobals : dict[str, Any] = {}
         super().__init__(self.name())
 
-    def subscribe(self, name, function) -> None:
+    def subscribe(self, name, function, wrapname='wrap') -> None:
         env = dict(self.envGlobals)
-        env['wrap'] = arg_wrap(function)
+        env[wrapname] = arg_wrap(src = function, wrapname=wrapname)
         exec(function, env, env)
         self.envGlobals[name] = env[name] #In order to access from other functions
         self.functions[name] = env[name] #In order to be called
@@ -93,7 +93,7 @@ class Box(IBox, ClientManager):
         elif query == 'function':
             if not 'id' in query or not 'value' in query:
                 pass #TODO: Log bad request
-            self.subscribe(query['id'], query['value'])
+            self.subscribe(query['id'], query['value'], query['wrapname'])
             protocol().write(QueryMaker.ok(), sck)
         elif query == 'call':
             if not 'id' in query or not 'args' in query or not 'kwargs' in query:
@@ -141,8 +141,8 @@ class RemoteBox(IBox):
     def overload(self) -> int:
         return QueryReader(protocol().ask(QueryMaker.overload_req(), self.client)).value()
 
-    def subscribe(self, name, function) -> None:
-        protocol().ask(QueryMaker.function_req(name, function), self.client)
+    def subscribe(self, name, function, wrapname) -> None:
+        protocol().ask(QueryMaker.function_req(name, function, wrapname), self.client)
 
     def call(self, name, *args, **kwargs) -> Any:
         return eval(QueryReader(protocol().ask(QueryMaker.call_req(name, *args, **kwargs), self.client)).value(), {}, {})
@@ -188,7 +188,7 @@ class BoxGroup(Set[IBox]):
         for i in range(0, len(fns)):
             fn : FunctionWrapper = fns[i]
             if mode != 1:
-                boxes[i % len(boxes)].subscribe(fn.name, repr(fn))
+                boxes[i % len(boxes)].subscribe(fn.name, repr(fn), fn.wrapname)
             if mode != 0:
                 res = boxes[i % len(boxes)].call(fn.name, *fn.args(), **fn.kwargs())
                 ret.append(res)

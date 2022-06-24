@@ -4,12 +4,13 @@ from typing import Any, Dict, List, Tuple, Union
 import inspect
 
 class FunctionWrapper:
-    __slots__ = ('fn','name','src','libs','preparation')
+    __slots__ = ('fn','name','src','wrapname','libs','preparation')
 
-    def __init__(self, fn : FunctionType, src : str = None, libs : set[str] = None) -> None:
+    def __init__(self, fn : FunctionType, src : str = None, wrapname : str = "wrap", libs : set[str] = None) -> None:
         self.fn = fn
         self.name = fn.__name__
         self.src = src or inspect.getsource(fn)
+        self.wrapname = wrapname
         #TODO: Get all the requeriments by the library (modules of functions for example)
         self.libs = libs or set(map(lambda v:v.__name__, filter(lambda x: isinstance(x,ModuleType), fn.__globals__.values())))
         self.preparation : Tuple[List,Dict] = None #arguments for a delegated call (args,kwargs)
@@ -24,7 +25,7 @@ class FunctionWrapper:
         return self.fn(*args, **kwargs) if self.preparation == None else self.fn(*self.preparation[0], **self.preparation[1])
 
     def make(self, *args, **kwargs) -> FunctionWrapper:
-        nf = FunctionWrapper(self.fn)
+        nf = FunctionWrapper(self.fn, wrapname=self.wrapname)
         nf.preparation = (args, kwargs)
         return nf
 
@@ -37,17 +38,27 @@ class FunctionWrapper:
     def spread(self, over, mode : int = 2) -> Union[Any, None]:
         return over.spread(self, mode)
 
+def name_of(f : inspect.FrameType) -> str:
+    from_ = inspect.getframeinfo(f)
+    name = from_.code_context[0].strip()
+    if name.find('@') == 0: name = name[1:]
+    i = name.find('(')
+    if i >= 0: name = name[0:i]
+    if name: return name
+    raise "Name not found, unexpected behaviour"
+
 def wrap():
+    name = name_of(inspect.currentframe().f_back)
     def wrapped(fn):
-        wrapper = FunctionWrapper(fn)
+        wrapper = FunctionWrapper(fn, wrapname=name)
         return wrapper
     return wrapped
 
 
-def arg_wrap(src : str = None, libs : set[str] = None):
+def arg_wrap(src : str = None, wrapname : str = 'wrap', libs : set[str] = None):
     def wrap():
         def wrapped(fn):
-            wrapper = FunctionWrapper(fn, src, libs)
+            wrapper = FunctionWrapper(fn, src, wrapname, libs)
             return wrapper
         return wrapped
     return wrap
