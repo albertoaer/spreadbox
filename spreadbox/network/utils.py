@@ -1,24 +1,60 @@
+from typing import Iterator, List, Tuple
 import socket
-from typing import List, Tuple
-from .protocol import ISocket, protocol
 import threading
 import time
+import psutil
+
+from .protocol import ISocket, protocol
 
 def ip() -> List[str]:
     host = socket.gethostname()
     return socket.gethostbyname_ex(host)[2]
 
-def makeClient(addr : Tuple[str, int], timeout : float) -> ISocket:
+def hostname() -> str:
+    return socket.gethostname()
+
+def mask(ip : str) -> str:
+    for _, v in psutil.net_if_addrs().items():
+        for c in v:
+            if c.netmask and in_same_net(c.address, ip, c.netmask):
+                return c.netmask
+    return ""
+
+def in_same_net(ipa : str, ipb : str, mask : str) -> bool:
+    for x, y, z in zip(ipa.split('.'), ipb.split('.'), mask.split('.')):
+        if int(x)&int(z) != int(y)&int(z):
+            return False
+    return True
+
+def get_net_addresses(ip : str, mask : str) -> Iterator[str]:
+    pairs = []
+    baseip = [int(v) for v in ip.split('.')]
+    for i, d in enumerate([255^int(v) for v in mask.split('.')]): #identify the mask target bits
+        for k in range(0, 8):
+            if (d>>k)&1 != 0:
+                baseip[i] = baseip[i]&(255^(1<<k))
+                pairs.append((i,k))
+    result = [[]]
+    for i in pairs: #generate the power set of all combinations of bytes
+        for j in range(len(result)):
+            if len(result[j]) != len(pairs)-1: #avoid last element, full of 1 would be broadcast address
+                result.append(result[j] + [i])
+                cloneip = baseip.copy()
+                for pair in result[len(result)-1]: #apply pairs
+                    cloneip[pair[0]] = cloneip[pair[0]]|(1<<pair[1])
+                yield ".".join(map(str, cloneip))
+
+def make_client(addr : Tuple[str, int], timeout : float) -> ISocket:
     sck = protocol().createSocket()
     sck.time(timeout)
     sck.intoConnection(addr)
     return sck
 
-def netMap(addrs : List[Tuple[str, int]], timeout : float = 0.001) -> List[ISocket]:
+def net_map(addrs : List[Tuple[str, int]], timeout : float = 0.001) -> List[ISocket]:
     results : List[Tuple[bool,ISocket]] = [] #Tuple(Ended,Socket)
     def connect(addr : Tuple[str, int], list : List[Tuple[bool,ISocket]], idx : int):
         try:
-            client = makeClient(addr, timeout)
+            client = make_client(addr, timeout)
             client.time(None)
             list[idx] = (True, client)
         except socket.error:
