@@ -26,6 +26,10 @@ class ISocket(ABC):
     def accept(self) -> ISocket:
         pass
 
+    @abstractmethod
+    def close(self) -> None:
+        pass
+
 class Protocol(ABC):
     def __init__(self, name : str) -> None:
         self.name = name

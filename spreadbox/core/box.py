@@ -4,6 +4,7 @@ import threading
 from typing import Any, Callable, List, Set, Tuple, Union
 from .function_wrapper import FunctionWrapper, arg_wrap
 from .queries import QueryMaker, QueryReader
+from .environment import Stoppable
 from ..network.protocol import ISocket, protocol
 from ..network.client_manager import ClientManager
 from ..network.utils import netMap, ip
@@ -47,7 +48,7 @@ class IBox(ABC):
         if not isinstance(o, Box): return False
         return self.name() == o.name()
 
-class Box(IBox, ClientManager):
+class Box(IBox, ClientManager, Stoppable):
     def __init__(self) -> None:
         super().__init__()
         self.functions : dict = {}
@@ -105,14 +106,21 @@ class Box(IBox, ClientManager):
             answer : Any = self.call(query['id'], *query['args'], **query['kwargs'])
             protocol().write(QueryMaker.call(query['id'], repr(answer)), sck)
 
-    def serve(self, port : int) -> None: #allow remote devices connect and use the box
+    def serve(self, port : int, service : bool = False) -> None: #allow remote devices connect and use the box
         if self.server != None:
             raise "Already served"
         self.server = protocol().createSocket()
         self.server.intoServer(port)
         #Thread configuration and execution
-        self.thread = Thread(target=self.runFor, args=(self.server,))
+        self.thread = Thread(target=self.runFor, args=(self.server,), daemon=service)
         self.thread.start()
+    
+    def stop(self) -> None:
+        if self.server != None:
+            self.server.close()
+        if self.thread != None:
+            self.stopServer()
+            self.thread.join()
     
     @staticmethod
     def seek(addr : Union[str, Tuple[str]], port : Union[int, Tuple[int]], matchs_per_second : int = 1000) -> BoxGroup:

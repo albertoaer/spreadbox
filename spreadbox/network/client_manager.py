@@ -10,16 +10,21 @@ class ClientManager(ABC):
         self.running : bool = False
         self.clients : List[Tuple[ISocket,Thread]] = []
 
-    def stop(self):
+    def stopServer(self):
         self.running = False
 
     def runFor(self, server : ISocket):
         self.running = True
         while self.running:
-            client = server.accept()
-            thread = Thread(target=self.attachClient, args=(client,))
-            self.clients.append((client, thread))
-            thread.start()
+            client : ISocket
+            try:
+                client = server.accept()
+            except:
+                self.running = False
+            else:
+                thread = Thread(target=self.attachClient, args=(client,))
+                self.clients.append((client, thread))
+                thread.start()
 
     def attachClient(self, con : ISocket):
         while self.running:

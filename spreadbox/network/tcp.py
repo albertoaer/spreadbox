@@ -25,6 +25,9 @@ class TCPSocket(ISocket): #TCP Socket uses TCP connections
         sck, addr = self.socket.accept()
         return TCPSocket(self.protocol, sck, addr)
 
+    def close(self) -> None:
+        self.socket.close()
+
 @use_protocol
 class TCPProtocol(Protocol): #Default TCP Protocol uses TCP Sockets and protocol and shares information in json format
     def __init__(self) -> None:
