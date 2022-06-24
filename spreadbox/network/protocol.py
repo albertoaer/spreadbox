@@ -1,8 +1,13 @@
 from __future__ import annotations
 from abc import ABC, abstractmethod
 import socket
-from typing import Tuple, Type
-import socket
+from typing import Tuple, Type, Union
+from enum import Enum
+
+class SocketRole(Enum):
+    Server = 0
+    Client = 1
+    Undefined = 2
 
 class ISocket(ABC):
     def __init__(self, protocol : Protocol, sck : socket.socket, addr: Tuple[str, int] = None) -> None:
@@ -19,7 +24,7 @@ class ISocket(ABC):
         pass
 
     @abstractmethod
-    def time(self, seconds : float) -> None:
+    def time(self, seconds : Union[float,None]) -> None:
         pass
 
     @abstractmethod
@@ -29,6 +34,10 @@ class ISocket(ABC):
     @abstractmethod
     def close(self) -> None:
         pass
+
+    @abstractmethod
+    def migrate(self, base : Union[ISocket, None] = None) -> Union[ISocket, None]:
+        return None #if returns None, its not implemented
 
 class Protocol(ABC):
     def __init__(self, name : str) -> None:
