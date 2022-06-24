@@ -27,7 +27,7 @@ class IBox(ABC):
         pass
 
     @abstractmethod
-    def __getitem__(self, k: str) -> Any:
+    def __getitem__(self, k: str) -> str:
         pass
 
     def __hash__(self) -> int:
@@ -61,16 +61,22 @@ class Box(IBox, ClientManager):
     def __setitem__(self, k: str, v: Any) -> None:
         self.envGlobals[k] = v
 
-    def __getitem__(self, k: str) -> Any:
-        return self.envGlobals[k]
+    def __getitem__(self, k: str) -> str:
+        return repr(self.envGlobals[k])
 
     def managerMessage(self, message: dict, sck: ISocket):
         query = QueryReader(message)
         if query == 'name':
             protocol().write(QueryMaker.name(self.name()), sck)
-        elif query == 'global':
+        elif query == 'global_get':
             if 'id' in query:
-                protocol().write(query.morph(value=self[query['id']]).query(), sck)
+                protocol().write(query.morph(value=self[query['id']]).query(), sck) #morphing query instead of use global_get
+            else:
+                pass #TODO: Log bad request
+        elif query == 'global_set':
+            if 'id' in query and 'value' in query:
+                self[query['id']] = eval(query.value(), self.envGlobals, {})
+                protocol().write(QueryMaker.ok(), sck)
             else:
                 pass #TODO: Log bad request
 
@@ -122,10 +128,10 @@ class RemoteBox(IBox):
         pass #TODO: Send call message
 
     def __setitem__(self, k: str, v: Any) -> None:
-        pass
+        protocol().ask(QueryMaker.global_set_req(k, repr(v)), self.client)
 
-    def __getitem__(self, k: str) -> Any:
-        return QueryReader(protocol().ask(QueryMaker.global_req(k), self.client)).value()
+    def __getitem__(self, k: str) -> str:
+        return eval(QueryReader(protocol().ask(QueryMaker.global_get_req(k), self.client)).value(), {}, {})
 
 class BoxGroup(Set[Box]):
     def __eq__(self, o: object) -> bool:

@@ -1,5 +1,5 @@
+from __future__ import annotations
 import functools
-from typing import Any
 
 """
 Query rules:
@@ -22,6 +22,10 @@ def query(typename : str):
     return wrapped
 
 class QueryMaker:
+    @query('ok')
+    def ok() -> dict:
+        return {}
+    
     @query('name')
     def name(name : str) -> dict:
         return {'value':name}
@@ -30,13 +34,16 @@ class QueryMaker:
     def name_req() -> dict:
         return {}
 
-    
-    @query('global')
-    def global_(id : str, value : str) -> dict:
+    @query('global_set')
+    def global_set_req(id : str, value : str) -> dict:
+        return {'value':value, 'id':id}
+
+    @query('global_get')
+    def global_get(id : str, value : str) -> dict:
         return {'value':value, 'id':id}
     
-    @query('global')
-    def global_req(id : str) -> dict:
+    @query('global_get')
+    def global_get_req(id : str) -> dict:
         return {'id':id}
 
 class QueryReader:
@@ -54,13 +61,16 @@ class QueryReader:
     def __getitem__(self, item : str) -> str:
         return self.__query[item]
 
-    def value(self) -> Any:
+    def value(self) -> str:
         return self.__query['value']
 
-    def morph(self, **kwargs):
+    def id(self) -> str:
+        return self.__query['id']
+
+    def morph(self, **kwargs) -> QueryReader:
         for x in kwargs.keys():
             self.__query[x] = kwargs[x]
         return self
 
-    def query(self):
+    def query(self) -> dict:
         return self.__query

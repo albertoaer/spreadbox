@@ -17,7 +17,10 @@ def server():
 
 def client():
     available = Box.network(303)
-    print(list(available)[0]['xd'])
+    target = list(available)[0]
+    print(target['xd'])
+    target['xd'] = 'other '+target['xd']
+    print(target['xd'])
     #factorial.spread(available)
 
 if __name__ == "__main__":
