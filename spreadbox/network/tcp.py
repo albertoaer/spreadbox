@@ -57,7 +57,7 @@ class TCPProtocol(Protocol): #Default TCP Protocol uses TCP Sockets and protocol
         msg = json.dumps(payload)
         sck.socket.sendall(bytearray(msg, 'utf-8'))
 
-    def read(self, sck : ISocket, size : int = 1024) -> dict:
+    def read(self, sck : ISocket, size : int = 1024) -> Union[dict, None]:
         msg = sck.socket.recv(size)
         if not msg: return None
         return json.loads(msg)

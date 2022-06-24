@@ -56,7 +56,7 @@ class Protocol(ABC):
         pass
 
     @abstractmethod
-    def read(self, sck : ISocket, size : int = 1024) -> dict:
+    def read(self, sck : ISocket, size : int = 1024) -> Union[dict, None]:
         pass
 
     @abstractmethod
