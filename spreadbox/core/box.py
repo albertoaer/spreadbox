@@ -178,6 +178,9 @@ class RemoteBox(IBox):
         self.remote_name = None
         self.logger = Logger("Remote::"+self.name())
 
+    def __del__(self):
+        self.client.close()
+
     def name(self) -> str:
         if self.remote_name == None:
             self.remote_name = QueryReader(protocol().ask(QueryMaker.name_req(), self.client)).value()
