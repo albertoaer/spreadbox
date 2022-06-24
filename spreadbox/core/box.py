@@ -2,7 +2,7 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 import threading
 from typing import Any, Callable, List, Set, Tuple, Union
-from .function_wrapper import FunctionWrapper
+from .function_wrapper import FunctionWrapper, wrap
 from .queries import QueryMaker, QueryReader
 from ..network.protocol import ISocket, protocol
 from ..network.client_manager import ClientManager
@@ -11,15 +11,15 @@ from threading import Thread
 
 class IBox(ABC):
     @abstractmethod
-    def name(self):
+    def name(self) -> str:
         pass
 
     @abstractmethod
-    def subscribe(self, name, function):
+    def subscribe(self, name, function) -> None:
         pass
 
     @abstractmethod
-    def call(self, name, *args, **kwargs):
+    def call(self, name, *args, **kwargs) -> Any:
         pass
 
     @abstractmethod
@@ -47,14 +47,17 @@ class Box(IBox, ClientManager):
         self.connections : dict[str, ISocket] = {}
         self.envGlobals : dict[str, Any] = {}
         self.thread : threading.Thread = None
+        self['wrap'] = wrap
 
-    def subscribe(self, name, function):
-        self.envGlobals[name] = function #In order to access from other functions
-        self.functions[name] = function #In order to be called
+    def subscribe(self, name, function) -> None:
+        env = dict(self.envGlobals)
+        exec(function, env, env)
+        self.envGlobals[name] = env[name] #In order to access from other functions
+        self.functions[name] = env[name] #In order to be called
 
-    def call(self, name, *args, **kwargs):
+    def call(self, name, *args, **kwargs) -> Any:
         try:
-            self.functions[name](*args, **kwargs)
+            return self.functions[name](*args, **kwargs)
         except BaseException as e:
             return e
 
@@ -79,8 +82,18 @@ class Box(IBox, ClientManager):
                 protocol().write(QueryMaker.ok(), sck)
             else:
                 pass #TODO: Log bad request
+        elif query == 'function':
+            if not 'id' in query or not 'value' in query:
+                pass #TODO: Log bad request
+            self.subscribe(query['id'], query['value'])
+            protocol().write(QueryMaker.ok(), sck)
+        elif query == 'call':
+            if not 'id' in query or not 'args' in query or not 'kwargs' in query:
+                pass #TODO: Log bad request
+            answer : Any = self.call(query['id'], *query['args'], **query['kwargs'])
+            protocol().write(QueryMaker.call(query['id'], answer), sck)
 
-    def serve(self, port : int): #allow remote devices connect and use the box
+    def serve(self, port : int) -> None: #allow remote devices connect and use the box
         if self.server != None:
             raise "Already served"
         self.server = protocol().createSocket()
@@ -116,16 +129,16 @@ class RemoteBox(IBox):
         self.client = client
         self.remote_name = None
 
-    def name(self):
+    def name(self) -> str:
         if self.remote_name == None:
             self.remote_name = QueryReader(protocol().ask(QueryMaker.name_req(), self.client)).value()
         return self.remote_name
 
-    def subscribe(self, name, function):
-        pass #TODO: Send subscription message
+    def subscribe(self, name, function) -> None:
+        protocol().ask(QueryMaker.function_req(name, function), self.client)
 
-    def call(self, name, *args, **kwargs):
-        pass #TODO: Send call message
+    def call(self, name, *args, **kwargs) -> Any:
+        return protocol().ask(QueryMaker.call_req(name, *args, **kwargs), self.client)
 
     def __setitem__(self, k: str, v: Any) -> None:
         protocol().ask(QueryMaker.global_set_req(k, repr(v)), self.client)
@@ -133,13 +146,13 @@ class RemoteBox(IBox):
     def __getitem__(self, k: str) -> str:
         return eval(QueryReader(protocol().ask(QueryMaker.global_get_req(k), self.client)).value(), {}, {})
 
-class BoxGroup(Set[Box]):
+class BoxGroup(Set[IBox]):
     def __eq__(self, o: object) -> bool:
         if o == None and len(self) == 0:
             return True #avoid empty group to prevent never ended tasks
         return super().__eq__(o)
     
-    def filter(self, fn : Callable[[str],bool]):
+    def filter(self, fn : Callable[[str],bool]) -> None:
         ln = set()
         for x in self:
             if not fn(x.name()):
@@ -155,5 +168,25 @@ class BoxGroup(Set[Box]):
             result[x.name()] = x
         return result
 
-    def spread(self, function : Union[FunctionWrapper, List[FunctionWrapper]]):
-        pass
+    def spread(self, function : Union[FunctionWrapper, List[FunctionWrapper]], mode : int = 2) -> Union[Any, List[Any], None]: #mode may be 0(subscription), 1(call), 2(both)
+        mode %= 3
+        fns : List[FunctionWrapper] = function
+        if isinstance(function, FunctionWrapper):
+            fns = [function]
+        boxes : List[IBox] = list(self)
+        if len(boxes) == 0:
+            raise Exception('No boxes available')
+        #TODO: Consult remote box states and sort
+        ret : List[Any] = []
+        for i in range(0, len(fns)):
+            fn : FunctionWrapper = fns[i]
+            if mode != 1:
+                boxes[i % len(boxes)].subscribe(fn.name, repr(fn))
+            if mode != 0:
+                res = boxes[i % len(boxes)].call(fn.name, *fn.preparation[0], **fn.preparation[1])
+                if isinstance(function, FunctionWrapper):
+                    return res
+                else:
+                    ret.append(res)
+        if mode != 0:
+            return ret

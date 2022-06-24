@@ -1,5 +1,6 @@
 from __future__ import annotations
 import functools
+from typing import Tuple
 
 """
 Query rules:
@@ -10,13 +11,14 @@ important parameters:
     value: the main value itself
 """
 
-def query(typename : str):
+def query(typename : str, is_request : bool = False):
     def wrapped(fn):
         @functools.wraps(fn)
         @staticmethod
         def call(*args, **kwrargs) -> dict:
             res = fn(*args, **kwrargs)
             res['type'] = typename
+            res['request'] = is_request
             return res
         return call
     return wrapped
@@ -34,17 +36,30 @@ class QueryMaker:
     def name_req() -> dict:
         return {}
 
-    @query('global_set')
+    @query('global_set', True)
     def global_set_req(id : str, value : str) -> dict:
-        return {'value':value, 'id':id}
+        return {'id':id, 'value':value}
 
     @query('global_get')
     def global_get(id : str, value : str) -> dict:
-        return {'value':value, 'id':id}
+        return {'id':id, 'value':value}
     
-    @query('global_get')
+    @query('global_get', True)
     def global_get_req(id : str) -> dict:
         return {'id':id}
+
+    @query('function', True)
+    def function_req(name : str, code : str) -> dict:
+        return {'id':name, 'value':code}
+
+    @query('call', True)
+    def call_req(name : str, *args, **kwargs) -> dict:
+        return {'id':name, 'args':args, 'kwargs':kwargs}
+
+    @query('call')
+    def call(name : str, resource : Tuple[int, str]) -> dict: #for the call result
+        return {'id':name, 'value':resource}
+
 
 class QueryReader:
     def __init__(self, query : dict) -> None:

@@ -1,7 +1,7 @@
 from __future__ import annotations
 import functools
 from types import FunctionType, ModuleType
-from typing import Any, Dict, List, Tuple
+from typing import Any, Dict, List, Tuple, Union
 import inspect
 
 class FunctionWrapper:
@@ -11,7 +11,7 @@ class FunctionWrapper:
         self.src = src or inspect.getsource(fn)
         #TODO: Get all the requeriments by the library (modules of functions for example)
         self.libs = libs or set(map(lambda v:v.__name__, filter(lambda x: isinstance(x,ModuleType), fn.__globals__.values())))
-        self.preparation : Tuple[List,Dict] = None #arguments for a delegated call (args,kwargs)
+        self.preparation : Tuple[List,Dict] = [(),{}] #arguments for a delegated call (args,kwargs)
 
     def __call__(self, *args: Any, **kwargs: Any) -> Any:
         return self.fn(*args, **kwargs) if self.preparation == None else self.fn(*self.preparation[0], **self.preparation[1])
@@ -27,8 +27,8 @@ class FunctionWrapper:
     def __str__(self) -> str:
         return str(self.fn)
 
-    def spread(self, over, *args, **kwargs):
-        over.spread(self[args, kwargs])
+    def spread(self, over, mode : int = 2) -> Union[Any, None]:
+        return over.spread(self, mode)
 
 def wrap():
     def wrapped(fn):

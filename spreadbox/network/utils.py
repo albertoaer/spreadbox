@@ -18,7 +18,7 @@ def netMap(addrs : List[Tuple[str, int]], timeout: float = 0.001) -> List[ISocke
     for addr in addrs:
         try:
             client = makeClient(addr, timeout)
-            list.append(client)
+            list.append(client) #TODO: Change socket timeout
         except socket.error:
             continue
     return list
