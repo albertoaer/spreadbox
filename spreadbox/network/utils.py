@@ -28,11 +28,11 @@ def netMap(addrs : List[Tuple[str, int]], timeout : float = 0.001) -> List[ISock
         results.append((False,None))
         thread.start()
     sockets : List[ISocket] = []
-    for x in results:
-        if not x[0]:
+    for x in range(0, len(results)):
+        if not results[x][0]:
             time.sleep(timeout)
-            if not x[0]:
+            if not results[x][0]:
                 continue
-        if x[1]:
-            sockets.append(x[1])
+        if results[x][1]:
+            sockets.append(results[x][1])
     return sockets
