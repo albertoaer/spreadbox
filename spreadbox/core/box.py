@@ -2,7 +2,7 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from typing import Any, Callable, List, Set, Tuple, Union
 from .function_wrapper import FunctionWrapper, arg_wrap
-from .queries import QueryMaker, QueryReader
+from ..data_processing import QueryMaker, QueryReader, eval_from_query, get_query
 from ..network.protocol import ISocket, protocol
 from ..network.client_manager import ClientManager
 from ..network.utils import netMap, ip
