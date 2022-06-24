@@ -1,6 +1,6 @@
 from __future__ import annotations
 import functools
-from typing import List, Tuple
+from typing import List
 
 """
 Query rules:
@@ -69,8 +69,24 @@ class QueryMaker:
         return {'id':name, 'args':args, 'kwargs':kwargs}
 
     @query('call')
-    def call(name : str, resource : Tuple[int, str]) -> dict: #for the call result
-        return {'id':name, 'value':resource}
+    def call(name : str, value_type : str, value : dict) -> dict:
+        return {'id':name, 'value_type':value_type, 'value':value}
+
+    @query('callasync', True)
+    def callasync_req(name : str, *args, **kwargs) -> dict:
+        return {'id':name, 'args':args, 'kwargs':kwargs}
+
+    @query('callasync')
+    def callasync(name : str, id : int) -> dict:
+        return {'id':name, 'value':id}
+
+    @query('resource', True)
+    def resource_req(id : int, delete : bool = False) -> dict:
+        return {'id':id, 'delete':delete}
+
+    @query('resource')
+    def resource(id : int, value_type : str, value : dict) -> dict:
+        return {'id':id, 'value_type':value_type, 'value':value}
 
     def function(name : str, code : str, wrapname : str = 'wrap', libs : List[dict] = []) -> dict:
         return {'name':name, 'value':code, 'wrapname':wrapname, 'libs':libs}

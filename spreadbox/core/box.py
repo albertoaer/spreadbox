@@ -1,10 +1,13 @@
 from __future__ import annotations
 from abc import ABCMeta, abstractmethod
+from threading import Thread
+from time import sleep
 from typing import Any, Callable, List, Set, Tuple, Union
+from queue import Queue
 
-from spreadbox.environment.logger import Logger
-
+from ..environment.logger import Logger
 from .function_wrapper import FunctionWrapper
+from .resource import Resource
 from ..data_processing import QueryMaker, QueryReader, eval_from_query, get_value_query
 from ..network.protocol import ISocket, protocol
 from ..network.client_manager import ClientManager
@@ -25,6 +28,14 @@ class IBox(metaclass=ABCMeta):
 
     @abstractmethod
     def call(self, name: str, *args, **kwargs) -> Any:
+        pass
+
+    @abstractmethod
+    def callasync(self, name: str, *args, **kwargs) -> Resource:
+        pass
+
+    @abstractmethod
+    def resource(self, id : int, delete : bool) -> Any:
         pass
 
     @abstractmethod
@@ -65,6 +76,8 @@ class Box(IBox, ClientManager, metaclass=MetaBox):
     def __init__(self) -> None:
         self.connections : dict[str, ISocket] = {}
         self.envGlobals : dict[str, Any] = self.shared_methods
+        self.idcounter : int = 0
+        self.resources : dict[int, Tuple[Thread, Queue]] = {}
         super().__init__("%s::%s" % (type(self).__name__, self.name()))
 
     def call(self, name: str, *args, **kwargs) -> Any:
@@ -74,6 +87,27 @@ class Box(IBox, ClientManager, metaclass=MetaBox):
             return fn(*args, **kwargs) if not use_self else fn(self, *args, **kwargs)
         except Exception as e:
             return e
+
+    def callasync(self, name: str, *args, **kwargs) -> Resource:
+        queue = Queue()
+        id = self.idcounter
+        t = Thread(target=lambda q: q.put(self.call(name, *args, **kwargs)), args=(queue,))
+        self.resources[id] = (t, queue)
+        self.idcounter += 1
+        t.start()
+        return Resource(id, self)
+
+    def resource(self, id : int, delete : bool) -> Any:
+        time = 0.0001
+        if id in self.resources:
+            while self.resources[id][1].qsize() == 0:
+                sleep(time)
+                time*=2
+            val = self.resources[id][1].get()
+            if delete:
+                del self.resources[id]
+            return val
+        return None
 
     def __setitem__(self, k: str, v: Any) -> None:
         self.envGlobals[k] = v
@@ -100,7 +134,15 @@ class Box(IBox, ClientManager, metaclass=MetaBox):
         elif query == 'call':
             if not 'id' in query or not 'args' in query or not 'kwargs' in query: return self.logger.err("Wrong request")
             answer : Any = self.call(query['id'], *query['args'], **query['kwargs'])
-            protocol().write(QueryMaker.call(query['id'], repr(answer)), sck)
+            t, v = get_value_query(answer)
+            protocol().write(QueryMaker.call(query['id'], t, v), sck)
+        elif query == 'callasync':
+            res = self.callasync(query['id'], *query['args'], **query['kwargs'])
+            protocol().write(QueryMaker.callasync(query['id'], res.resource), sck)
+        elif query == 'resource':
+            val = self.resource(query['id'], query['delete'])
+            t, v = get_value_query(val)
+            protocol().write(QueryMaker.resource(query['id'], t, v), sck)
     
     @staticmethod
     def get(addr : str, port : int, timeout : float = 1) -> Union[RemoteBox, None]:
@@ -148,7 +190,16 @@ class RemoteBox(IBox):
         return QueryReader(protocol().ask(QueryMaker.overload_req(), self.client)).value()
 
     def call(self, name: str, *args, **kwargs) -> Any:
-        return eval(QueryReader(protocol().ask(QueryMaker.call_req(name, *args, **kwargs), self.client)).value(), {}, {})
+        query = QueryReader(protocol().ask(QueryMaker.call_req(name, *args, **kwargs), self.client))
+        return eval_from_query(query['value_type'], query['value'], ({}, {}))
+
+    def callasync(self, name: str, *args, **kwargs) -> Resource:
+        query = QueryReader(protocol().ask(QueryMaker.callasync_req(name, *args, **kwargs), self.client))
+        return Resource(query['value'], self)
+
+    def resource(self, id : int, delete : bool) -> Any:
+        ans = QueryReader(protocol().ask(QueryMaker.resource_req(id, delete), self.client))
+        return eval_from_query(ans['value_type'], ans['value'], ({}, {}))
 
     def __setitem__(self, k: str, v: Any) -> None:
         t, v = get_value_query(v)
@@ -192,6 +243,12 @@ class BoxGroup(Set[IBox]):
         res = []
         for x in self:
             res.append(x.call(name, *args, **kwargs))
+        return res[0] if len(res) == 1 else res
+
+    def callasync(self, name: str, *args, **kwargs) -> Union[Resource, List[Resource]]:
+        res = []
+        for x in self:
+            res.append(x.callasync(name, *args, **kwargs))
         return res[0] if len(res) == 1 else res
 
     def spread(self, function : Union[FunctionWrapper, List[FunctionWrapper]], mode : int = 2) -> Union[Any, List[Any], None]: #mode may be 0(subscription), 1(call), 2(both)

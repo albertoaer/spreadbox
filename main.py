@@ -24,11 +24,9 @@ def server():
 def client():
     box = Box.get(ip()[-1], 303).group()
     box.set(factorial=factorial)
-    print(box.call('factorial', 5))
-    box.call('sum', 2)
-    box.call('sum', 3)
-    print(box.call('stored'))
-    #print(boxes.spread([factorial.make(3), factorial.make(5)]))
+    res = box.callasync('factorial', 4)
+    res2 = box.callasync('factorial', 6)
+    print(res.get() + res2.get())
 
 if __name__ == "__main__":
     server()
