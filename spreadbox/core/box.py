@@ -114,11 +114,10 @@ class Box(IBox, ClientManager, metaclass=MetaBox):
         if isinstance(addr, str):
             addrs = [addr]
         if isinstance(port, tuple) and len(addrs) != len(port):
-            raise 'Expecting same number of addresses and ports'
+            raise Exception('Expecting same number of addresses and ports')
         for sck in netMap(list(zip(addrs, port) if isinstance(port, tuple) else map(lambda a: (a, port), addrs)), 1/matchs_per_second):
             group.add(RemoteBox(sck))
-        if len(group) == 0: return None #avoid return empty group to prevent never ended tasks
-        return group
+        return group if group else None #avoid return empty group to prevent never ended tasks
 
     @staticmethod
     def network(port : int, filter : Callable[[str],bool] = None, matchs_per_second : int = 1000) -> BoxGroup:
@@ -126,7 +125,7 @@ class Box(IBox, ClientManager, metaclass=MetaBox):
         thisip = ip()[-1]
         modableip = '.'.join(thisip.split('.')[0:-1]) + "."
         group = Box.seek([modableip + str(num) for num in range(0, 256)], port, matchs_per_second)
-        if filter != None and group != None:
+        if filter and group:
             group.filter(filter)
         return group
 
@@ -162,8 +161,7 @@ class RemoteBox(IBox):
 
 class BoxGroup(Set[IBox]):
     def __eq__(self, o: object) -> bool:
-        if o == None and len(self) == 0:
-            return True #avoid empty group to prevent never ended tasks
+        if o == None and len(self) == 0: return True #empty group is equals to void group
         return super().__eq__(o)
     
     def filter(self, fn : Callable[[str],bool]) -> None:

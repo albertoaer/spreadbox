@@ -1,6 +1,6 @@
 from __future__ import annotations
 import functools
-from typing import Tuple
+from typing import List, Tuple
 
 """
 Query rules:
@@ -72,8 +72,8 @@ class QueryMaker:
     def call(name : str, resource : Tuple[int, str]) -> dict: #for the call result
         return {'id':name, 'value':resource}
 
-    def function(name : str, code : str, wrapname : str = 'wrap') -> dict:
-        return {'name':name, 'value':code, 'wrapname':wrapname}
+    def function(name : str, code : str, wrapname : str = 'wrap', libs : List[dict] = []) -> dict:
+        return {'name':name, 'value':code, 'wrapname':wrapname, 'libs':libs}
 
     def literal(data : str) -> dict:
         return {'value':data}

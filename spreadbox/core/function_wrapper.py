@@ -1,20 +1,22 @@
 from __future__ import annotations
-from types import FunctionType, ModuleType
+from types import FunctionType
 from typing import Any, Dict, List, Tuple, Union
+from .dependencies import DependencySolver
 import inspect
 
-def no_indent(src : str) -> str: return '\n'.join([s.lstrip() for s in src.split('\n')])
+#def remove_first_indent(src : str) -> str:
+#    return '\n'.join([s.lstrip() for s in src.split('\n')])
 
 class FunctionWrapper:
     __slots__ = ('fn','name','src','wrapname','libs','preparation')
 
-    def __init__(self, fn : FunctionType, src : str = None, wrapname : str = "wrap", libs : set[str] = None) -> None:
+    def __init__(self, fn : FunctionType, src : str = None, wrapname : str = "wrap", libs : List[dict] = None) -> None:
         self.fn = fn
         self.name = fn.__name__
-        self.src = src or no_indent(inspect.getsource(fn)) #removes indentation, wrapped function are not holded in any scope
+        #TODO: Indents are broken
+        self.src = src or inspect.getsource(fn) #removes indentation, wrapped function are not holded in any scope
         self.wrapname = wrapname
-        #TODO: Get all the requeriments by the library (modules of functions for example)
-        self.libs = libs or set(map(lambda v:v.__name__, filter(lambda x: isinstance(x,ModuleType), fn.__globals__.values())))
+        self.libs = libs or DependencySolver.solve(fn).format()
         self.preparation : Tuple[List,Dict] = None #arguments for a delegated call (args,kwargs)
 
     def args(self) -> List:
@@ -27,7 +29,7 @@ class FunctionWrapper:
         return self.fn(*args, **kwargs) if self.preparation == None else self.fn(*self.preparation[0], **self.preparation[1])
 
     def make(self, *args, **kwargs) -> FunctionWrapper:
-        nf = FunctionWrapper(self.fn, wrapname=self.wrapname)
+        nf = FunctionWrapper(self.fn, self.str, self.wrapname, self.libs)
         nf.preparation = (args, kwargs)
         return nf
 
@@ -47,7 +49,7 @@ def name_of(f : inspect.FrameType) -> str:
     i = name.find('(')
     if i >= 0: name = name[0:i]
     if name: return name
-    raise "Name not found, unexpected behaviour"
+    raise Exception("Name not found, unexpected behaviour")
 
 def wrap():
     name = name_of(inspect.currentframe().f_back)
