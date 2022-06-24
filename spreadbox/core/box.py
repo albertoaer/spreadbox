@@ -24,7 +24,7 @@ class IBox(metaclass=ABCMeta):
         pass
 
     @abstractmethod
-    def call(self, name, *args, **kwargs) -> Any:
+    def call(self, name: str, *args, **kwargs) -> Any:
         pass
 
     @abstractmethod
@@ -67,7 +67,7 @@ class Box(IBox, ClientManager, metaclass=MetaBox):
         self.envGlobals : dict[str, Any] = self.shared_methods
         super().__init__("%s::%s" % (type(self).__name__, self.name()))
 
-    def call(self, name, *args, **kwargs) -> Any:
+    def call(self, name: str, *args, **kwargs) -> Any:
         try:
             fn = self.envGlobals[name]
             use_self = hasattr(fn, '__use_self__') and fn.__use_self__
@@ -147,7 +147,7 @@ class RemoteBox(IBox):
     def overload(self) -> int:
         return QueryReader(protocol().ask(QueryMaker.overload_req(), self.client)).value()
 
-    def call(self, name, *args, **kwargs) -> Any:
+    def call(self, name: str, *args, **kwargs) -> Any:
         return eval(QueryReader(protocol().ask(QueryMaker.call_req(name, *args, **kwargs), self.client)).value(), {}, {})
 
     def __setitem__(self, k: str, v: Any) -> None:
@@ -158,6 +158,9 @@ class RemoteBox(IBox):
         query = QueryReader(protocol().ask(QueryMaker.get_req(k), self.client))
         if not 'value_type' in query or not 'value' in query: return self.logger.err("Wrong answer")
         return eval_from_query(query['value_type'], query['value'], ({}, {}))
+
+    def group(self) -> BoxGroup:
+        return BoxGroup({self})
 
 class BoxGroup(Set[IBox]):
     def __eq__(self, o: object) -> bool:
@@ -179,6 +182,17 @@ class BoxGroup(Set[IBox]):
         for x in self:
             result[x.name()] = x
         return result
+
+    def set(self, **kwargs):
+        for k, v in kwargs.items():
+            for x in self:
+                x[k] = v
+
+    def call(self, name: str, *args, **kwargs) -> Union[Any, List[Any]]:
+        res = []
+        for x in self:
+            res.append(x.call(name, *args, **kwargs))
+        return res[0] if len(res) == 1 else res
 
     def spread(self, function : Union[FunctionWrapper, List[FunctionWrapper]], mode : int = 2) -> Union[Any, List[Any], None]: #mode may be 0(subscription), 1(call), 2(both)
         mode %= 3

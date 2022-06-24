@@ -22,8 +22,8 @@ def server():
     box.serve(303, False)
 
 def client():
-    box = Box.get(ip()[-1], 303)
-    box['factorial'] = factorial
+    box = Box.get(ip()[-1], 303).group()
+    box.set(factorial=factorial)
     print(box.call('factorial', 5))
     box.call('sum', 2)
     box.call('sum', 3)
