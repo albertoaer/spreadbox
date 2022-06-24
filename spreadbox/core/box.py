@@ -44,9 +44,10 @@ class IBox(metaclass=ABCMeta):
         if not isinstance(o, Box): return False
         return self.name() == o.name()
 
-def shared():
+def shared(use_self : bool = False):
     def shared_obj(obj : Any) -> Any: #Allows properties be accessed from the outside
         obj.__is_shared__ = True
+        obj.__use_self__ = use_self
         return obj
     return shared_obj
 
@@ -68,7 +69,9 @@ class Box(IBox, ClientManager, metaclass=MetaBox):
 
     def call(self, name, *args, **kwargs) -> Any:
         try:
-            return self.envGlobals[name](*args, **kwargs)
+            fn = self.envGlobals[name]
+            use_self = hasattr(fn, '__use_self__') and fn.__use_self__
+            return fn(*args, **kwargs) if not use_self else fn(self, *args, **kwargs)
         except Exception as e:
             return e
 
