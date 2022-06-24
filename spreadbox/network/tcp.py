@@ -1,11 +1,11 @@
 import socket
 from typing import Tuple, Union
 from .utils import ip
-from .protocol import Protocol, ISocket, SocketRole, use_protocol
+from .protocol import Protocol, ISocket, SocketRole, Address, use_protocol
 import json
 
 class TCPSocket(ISocket): #TCP Socket uses TCP connections
-    def __init__(self, protocol : Protocol, sck : socket.socket, addr: Tuple[str, int] = None) -> None:
+    def __init__(self, protocol : Protocol, sck : socket.socket, addr: Address = None) -> None:
         super().__init__(protocol, sck, addr)
         self.backlog = 5
         self.role : SocketRole = SocketRole.Undefined
@@ -17,7 +17,7 @@ class TCPSocket(ISocket): #TCP Socket uses TCP connections
         self.socket.listen(self.backlog)
         self.role = SocketRole.Server
 
-    def intoConnection(self, addr : Tuple[str, int]) -> None:
+    def intoConnection(self, addr : Address) -> None:
         if self.role != SocketRole.Undefined: raise "Expecting unassigned socket"
         self.addr = addr
         self.socket.connect(addr)
@@ -50,7 +50,7 @@ class TCPProtocol(Protocol): #Default TCP Protocol uses TCP Sockets and protocol
     def createSocket(self) -> ISocket:
         return TCPSocket(self, socket.socket(socket.AF_INET, socket.SOCK_STREAM))
 
-    def wrapSocket(self, sck : socket.socket, addr: Tuple[str, int] = None) -> ISocket:
+    def wrapSocket(self, sck : socket.socket, addr: Address = None) -> ISocket:
         return TCPSocket(self, sck, addr)
 
     def write(self, payload : dict, sck : ISocket) -> None:
@@ -58,9 +58,11 @@ class TCPProtocol(Protocol): #Default TCP Protocol uses TCP Sockets and protocol
         sck.socket.sendall(bytearray(msg, 'utf-8'))
 
     def read(self, sck : ISocket, size : int = 1024) -> Union[dict, None]:
-        msg = sck.socket.recv(size)
-        if not msg: return None
-        return json.loads(msg)
+        try:
+            msg = sck.socket.recv(size)
+            return None if not msg else json.loads(msg)
+        except socket.error:
+            return None
 
     def ask(self, payload : dict, sck : ISocket) -> dict:
         self.write(payload, sck)

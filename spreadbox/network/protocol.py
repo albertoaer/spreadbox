@@ -1,7 +1,7 @@
 from __future__ import annotations
 from abc import ABC, abstractmethod
 import socket
-from typing import Tuple, Type, Union
+from typing import Tuple, Type, Union, NewType
 from enum import Enum
 
 class SocketRole(Enum):
@@ -9,8 +9,10 @@ class SocketRole(Enum):
     Client = 1
     Undefined = 2
 
+Address = NewType('Address', Tuple[str, int])
+
 class ISocket(ABC):
-    def __init__(self, protocol : Protocol, sck : socket.socket, addr: Tuple[str, int] = None) -> None:
+    def __init__(self, protocol : Protocol, sck : socket.socket, addr: Address = None) -> None:
         self.protocol = protocol
         self.socket = sck
         self.addr = addr
@@ -20,7 +22,7 @@ class ISocket(ABC):
         pass
 
     @abstractmethod
-    def intoConnection(self, addr : Tuple[str, int]) -> None:
+    def intoConnection(self, addr : Address) -> None:
         pass
 
     @abstractmethod
@@ -48,7 +50,7 @@ class Protocol(ABC):
         pass
 
     @abstractmethod
-    def wrapSocket(self, sck : socket.socket, addr: Tuple[str, int] = None) -> ISocket:
+    def wrapSocket(self, sck : socket.socket, addr: Address = None) -> ISocket:
         pass
 
     @abstractmethod

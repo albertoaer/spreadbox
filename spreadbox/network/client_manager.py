@@ -1,15 +1,15 @@
 from abc import abstractmethod
 from time import sleep
-from typing import List, Tuple
+from typing import Dict, Tuple
 from ..environment.stoppable import Stoppable
-from .protocol import ISocket, protocol
+from .protocol import ISocket, Address, protocol
 from threading import Thread
 
 class ClientManager(Stoppable):
     def __init__(self) -> None:
         super().__init__()
         self.running : bool = False
-        self.clients : List[Tuple[ISocket,Thread]] = []
+        self.clients : Dict[Address, Tuple[ISocket,Thread]] = {}
         self.server : ISocket = None
         self.thread : Thread = None
 
@@ -26,7 +26,7 @@ class ClientManager(Stoppable):
                 self.running = False
             else:
                 thread = Thread(target=self.attachClient, args=(client,))
-                self.clients.append((client, thread))
+                self.clients[client.addr] = (client, thread)
                 thread.start()
 
     def attachClient(self, con : ISocket):
@@ -34,7 +34,9 @@ class ClientManager(Stoppable):
             data = protocol().read(con)
             if data:
                 self.managerMessage(data, con)
-            else: sleep(0.001)
+            else:
+                break #If no data is read the client must be gone
+        del self.clients[con.addr]
 
     def serve(self, port : int, prevail : bool = True) -> None: #create a service that manage users
         if self.server != None:
