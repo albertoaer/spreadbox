@@ -1,6 +1,5 @@
 from __future__ import annotations
 from abc import ABC, abstractmethod
-import threading
 from typing import Any, Callable, List, Set, Tuple, Union
 from .function_wrapper import FunctionWrapper, arg_wrap
 from .queries import QueryMaker, QueryReader
