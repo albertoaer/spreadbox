@@ -47,10 +47,10 @@ class IBox(ABC):
 
 class Box(IBox, ClientManager):
     def __init__(self) -> None:
-        super().__init__()
         self.functions : dict = {}
         self.connections : dict[str, ISocket] = {}
         self.envGlobals : dict[str, Any] = {}
+        super().__init__(self.name())
 
     def subscribe(self, name, function) -> None:
         env = dict(self.envGlobals)

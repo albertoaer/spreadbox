@@ -1,23 +1,25 @@
 from abc import abstractmethod
 from time import sleep
 from typing import Dict, Tuple
-from ..environment.stoppable import Stoppable
+from ..environment import Stoppable, Logger
 from .protocol import ISocket, Address, protocol
 from threading import Thread
 
 class ClientManager(Stoppable):
-    def __init__(self) -> None:
+    def __init__(self, id : str = None) -> None:
         super().__init__()
         self.running : bool = False
         self.clients : Dict[Address, Tuple[ISocket,Thread]] = {}
         self.server : ISocket = None
         self.thread : Thread = None
+        self.logger : Logger = Logger(id or "Server")
 
     def stopServer(self):
         self.running = False
 
     def run(self):
         self.running = True
+        self.logger.info("Running")
         while self.running:
             client : ISocket
             try:
