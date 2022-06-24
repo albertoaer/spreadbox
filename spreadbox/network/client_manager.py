@@ -35,7 +35,7 @@ class ClientManager(Stoppable):
         while self.running:
             data = protocol().read(con)
             if data:
-                self.managerMessage(data, con)
+                self.handleMessage(data, con)
             else:
                 break #If no data is read the client must be gone
         del self.clients[con.addr]
@@ -57,5 +57,5 @@ class ClientManager(Stoppable):
             self.thread.join()
 
     @abstractmethod
-    def managerMessage(self, message: dict, sck : ISocket):
+    def handleMessage(self, message: dict, sck : ISocket):
         pass
