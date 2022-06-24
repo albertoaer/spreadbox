@@ -11,7 +11,13 @@ class FunctionWrapper:
         self.src = src or inspect.getsource(fn)
         #TODO: Get all the requeriments by the library (modules of functions for example)
         self.libs = libs or set(map(lambda v:v.__name__, filter(lambda x: isinstance(x,ModuleType), fn.__globals__.values())))
-        self.preparation : Tuple[List,Dict] = [(),{}] #arguments for a delegated call (args,kwargs)
+        self.preparation : Tuple[List,Dict] = None #arguments for a delegated call (args,kwargs)
+
+    def args(self) -> List:
+        return self.preparation[0] if self.preparation != None else ()
+
+    def kwargs(self) -> Dict:
+        return self.preparation[1] if self.preparation != None else {}
 
     def __call__(self, *args: Any, **kwargs: Any) -> Any:
         return self.fn(*args, **kwargs) if self.preparation == None else self.fn(*self.preparation[0], **self.preparation[1])
@@ -35,3 +41,12 @@ def wrap():
         wrapper = functools.wraps(fn)(FunctionWrapper(fn))
         return wrapper
     return wrapped
+
+
+def arg_wrap(src : str = None, libs : set[str] = None):
+    def wrap():
+        def wrapped(fn):
+            wrapper = functools.wraps(fn)(FunctionWrapper(fn, src, libs))
+            return wrapper
+        return wrapped
+    return wrap

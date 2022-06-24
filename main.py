@@ -21,7 +21,7 @@ def client():
     print(target['xd'])
     target['xd'] = 'other '+target['xd']
     print(target['xd'])
-    factorial.make(5).spread(available)
+    print(factorial.make(5).spread(available))
 
 if __name__ == "__main__":
     server()

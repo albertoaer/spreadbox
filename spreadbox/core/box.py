@@ -2,7 +2,7 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 import threading
 from typing import Any, Callable, List, Set, Tuple, Union
-from .function_wrapper import FunctionWrapper, wrap
+from .function_wrapper import FunctionWrapper, arg_wrap
 from .queries import QueryMaker, QueryReader
 from ..network.protocol import ISocket, protocol
 from ..network.client_manager import ClientManager
@@ -47,10 +47,10 @@ class Box(IBox, ClientManager):
         self.connections : dict[str, ISocket] = {}
         self.envGlobals : dict[str, Any] = {}
         self.thread : threading.Thread = None
-        self['wrap'] = wrap
 
     def subscribe(self, name, function) -> None:
         env = dict(self.envGlobals)
+        env['wrap'] = arg_wrap(function)
         exec(function, env, env)
         self.envGlobals[name] = env[name] #In order to access from other functions
         self.functions[name] = env[name] #In order to be called
@@ -91,7 +91,7 @@ class Box(IBox, ClientManager):
             if not 'id' in query or not 'args' in query or not 'kwargs' in query:
                 pass #TODO: Log bad request
             answer : Any = self.call(query['id'], *query['args'], **query['kwargs'])
-            protocol().write(QueryMaker.call(query['id'], answer), sck)
+            protocol().write(QueryMaker.call(query['id'], repr(answer)), sck)
 
     def serve(self, port : int) -> None: #allow remote devices connect and use the box
         if self.server != None:
@@ -138,7 +138,7 @@ class RemoteBox(IBox):
         protocol().ask(QueryMaker.function_req(name, function), self.client)
 
     def call(self, name, *args, **kwargs) -> Any:
-        return protocol().ask(QueryMaker.call_req(name, *args, **kwargs), self.client)
+        return eval(QueryReader(protocol().ask(QueryMaker.call_req(name, *args, **kwargs), self.client)).value(), {}, {})
 
     def __setitem__(self, k: str, v: Any) -> None:
         protocol().ask(QueryMaker.global_set_req(k, repr(v)), self.client)
@@ -183,10 +183,9 @@ class BoxGroup(Set[IBox]):
             if mode != 1:
                 boxes[i % len(boxes)].subscribe(fn.name, repr(fn))
             if mode != 0:
-                res = boxes[i % len(boxes)].call(fn.name, *fn.preparation[0], **fn.preparation[1])
-                if isinstance(function, FunctionWrapper):
-                    return res
-                else:
-                    ret.append(res)
+                res = boxes[i % len(boxes)].call(fn.name, *fn.args(), **fn.kwargs())
+                ret.append(res)
         if mode != 0:
+            if isinstance(function, FunctionWrapper):
+                    return ret[0]
             return ret
