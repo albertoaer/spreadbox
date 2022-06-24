@@ -1,7 +1,10 @@
 from spreadbox import Box, wrap
+from spreadbox.network.utils import ip
 
 class MyBox(Box):
-    def name(self): return 'MyBox'
+    def name(self) -> str : return 'MyBox'
+    def on(self) -> bool: return True
+    def overload(self) -> int: return 0
 
 @wrap()
 def factorial(x : int):
@@ -11,13 +14,13 @@ def factorial(x : int):
 
 def server():
     box = MyBox()
-    print(box.name())
+    box2 = MyBox()
     box.serve(303)
+    box2.serve(304)
 
 def client():
-    available = Box.network(303)
-    target = list(available)[0]
-    print(factorial.make(5).spread(available))
+    available = Box.seek((ip()[-1],ip()[-1]), (303,304))
+    print(available.spread([factorial.make(3), factorial.make(5)]))
 
 if __name__ == "__main__":
     server()

@@ -31,9 +31,25 @@ class QueryMaker:
     @query('name')
     def name(name : str) -> dict:
         return {'value':name}
-    
+
     @query('name')
     def name_req() -> dict:
+        return {}
+    
+    @query('on')
+    def on(on : bool) -> dict:
+        return {'value':on}
+
+    @query('on')
+    def on_req() -> dict:
+        return {}
+
+    @query('overload')
+    def overload(state : int) -> dict:
+        return {'value':state}
+
+    @query('overload')
+    def overload_req() -> dict:
         return {}
 
     @query('global_set', True)

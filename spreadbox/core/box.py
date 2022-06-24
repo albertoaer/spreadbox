@@ -15,6 +15,14 @@ class IBox(ABC):
         pass
 
     @abstractmethod
+    def on(self) -> bool:
+        pass
+
+    @abstractmethod
+    def overload(self) -> int:
+        pass
+
+    @abstractmethod
     def subscribe(self, name, function) -> None:
         pass
 
@@ -71,6 +79,10 @@ class Box(IBox, ClientManager):
         query = QueryReader(message)
         if query == 'name':
             protocol().write(QueryMaker.name(self.name()), sck)
+        elif query == 'on':
+            protocol().write(QueryMaker.on(self.on()), sck)
+        elif query == 'overload':
+            protocol().write(QueryMaker.overload(self.overload()), sck)
         elif query == 'global_get':
             if 'id' in query:
                 protocol().write(query.morph(value=self[query['id']]).query(), sck) #morphing query instead of use global_get
@@ -103,12 +115,14 @@ class Box(IBox, ClientManager):
         self.thread.start()
     
     @staticmethod
-    def seek(addr : Union[str, Tuple[str]], port : int, matchs_per_second : int = 1000) -> BoxGroup:
+    def seek(addr : Union[str, Tuple[str]], port : Union[int, Tuple[int]], matchs_per_second : int = 1000) -> BoxGroup:
         group = BoxGroup()
         addrs = addr
         if isinstance(addr, str):
             addrs = [addr]
-        for sck in netMap(map(lambda a: (a, port), addrs), 1/matchs_per_second):
+        if isinstance(port, tuple) and len(addrs) != len(port):
+            raise 'Expecting same number of addresses and ports'
+        for sck in netMap(list(zip(addrs, port) if isinstance(port, tuple) else map(lambda a: (a, port), addrs)), 1/matchs_per_second):
             group.add(RemoteBox(sck))
         if len(group) == 0: return None #avoid return empty group to prevent never ended tasks
         return group
@@ -133,6 +147,12 @@ class RemoteBox(IBox):
         if self.remote_name == None:
             self.remote_name = QueryReader(protocol().ask(QueryMaker.name_req(), self.client)).value()
         return self.remote_name
+
+    def on(self) -> bool:
+        return QueryReader(protocol().ask(QueryMaker.on_req(), self.client)).value()
+
+    def overload(self) -> int:
+        return QueryReader(protocol().ask(QueryMaker.overload_req(), self.client)).value()
 
     def subscribe(self, name, function) -> None:
         protocol().ask(QueryMaker.function_req(name, function), self.client)
@@ -173,10 +193,10 @@ class BoxGroup(Set[IBox]):
         fns : List[FunctionWrapper] = function
         if isinstance(function, FunctionWrapper):
             fns = [function]
-        boxes : List[IBox] = list(self)
+        boxes : List[IBox] = [box for box in list(self) if box.on()]
         if len(boxes) == 0:
             raise Exception('No boxes available')
-        #TODO: Consult remote box states and sort
+        boxes = sorted(boxes, key=lambda e : e.overload())
         ret : List[Any] = []
         for i in range(0, len(fns)):
             fn : FunctionWrapper = fns[i]
