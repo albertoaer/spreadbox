@@ -1,8 +1,11 @@
 from __future__ import annotations
 from abc import ABC, abstractmethod
 from typing import Any, Callable, List, Set, Tuple, Union
-from .function_wrapper import FunctionWrapper, arg_wrap
-from ..data_processing import QueryMaker, QueryReader, eval_from_query, get_query
+
+from spreadbox.environment.logger import Logger
+
+from .function_wrapper import FunctionWrapper
+from ..data_processing import QueryMaker, QueryReader, eval_from_query, get_value_query
 from ..network.protocol import ISocket, protocol
 from ..network.client_manager import ClientManager
 from ..network.utils import netMap, ip
@@ -18,10 +21,6 @@ class IBox(ABC):
 
     @abstractmethod
     def overload(self) -> int:
-        pass
-
-    @abstractmethod
-    def subscribe(self, name, function) -> None:
         pass
 
     @abstractmethod
@@ -47,21 +46,13 @@ class IBox(ABC):
 
 class Box(IBox, ClientManager):
     def __init__(self) -> None:
-        self.functions : dict = {}
         self.connections : dict[str, ISocket] = {}
         self.envGlobals : dict[str, Any] = {}
-        super().__init__(self.name())
-
-    def subscribe(self, name, function, wrapname='wrap') -> None:
-        env = dict(self.envGlobals)
-        env[wrapname] = arg_wrap(src = function, wrapname=wrapname)
-        exec(function, env, env)
-        self.envGlobals[name] = env[name] #In order to access from other functions
-        self.functions[name] = env[name] #In order to be called
+        super().__init__("%s::%s" % (type(self).__name__, self.name()))
 
     def call(self, name, *args, **kwargs) -> Any:
         try:
-            return self.functions[name](*args, **kwargs)
+            return self.envGlobals[name](*args, **kwargs)
         except BaseException as e:
             return e
 
@@ -69,7 +60,7 @@ class Box(IBox, ClientManager):
         self.envGlobals[k] = v
 
     def __getitem__(self, k: str) -> str:
-        return repr(self.envGlobals[k])
+        return self.envGlobals[k]
 
     def managerMessage(self, message: dict, sck: ISocket):
         query = QueryReader(message)
@@ -79,25 +70,16 @@ class Box(IBox, ClientManager):
             protocol().write(QueryMaker.on(self.on()), sck)
         elif query == 'overload':
             protocol().write(QueryMaker.overload(self.overload()), sck)
-        elif query == 'global_get':
-            if 'id' in query:
-                protocol().write(query.morph(value=self[query['id']]).query(), sck) #morphing query instead of use global_get
-            else:
-                pass #TODO: Log bad request
-        elif query == 'global_set':
-            if 'id' in query and 'value' in query:
-                self[query['id']] = eval(query.value(), self.envGlobals, {})
-                protocol().write(QueryMaker.ok(), sck)
-            else:
-                pass #TODO: Log bad request
-        elif query == 'function':
-            if not 'id' in query or not 'value' in query:
-                pass #TODO: Log bad request
-            self.subscribe(query['id'], query['value'], query['wrapname'])
+        elif query == 'get':
+            if not 'id' in query: return self.logger.err("Wrong request")
+            t, v = get_value_query(self[query['id']])
+            protocol().write(query.morph(value_type=t, value=v).query(), sck) #morphing query instead of use global_get
+        elif query == 'set':
+            if not 'id' in query or not 'value_type' in query or not 'value' in query: return self.logger.err("Wrong request")
+            self[query['id']] = eval_from_query(query['value_type'], query['value'], (self.envGlobals,{}))
             protocol().write(QueryMaker.ok(), sck)
         elif query == 'call':
-            if not 'id' in query or not 'args' in query or not 'kwargs' in query:
-                pass #TODO: Log bad request
+            if not 'id' in query or not 'args' in query or not 'kwargs' in query: return self.logger.err("Wrong request")
             answer : Any = self.call(query['id'], *query['args'], **query['kwargs'])
             protocol().write(QueryMaker.call(query['id'], repr(answer)), sck)
     
@@ -129,6 +111,7 @@ class RemoteBox(IBox):
         super().__init__()
         self.client = client
         self.remote_name = None
+        self.logger = Logger("Remote::"+self.name())
 
     def name(self) -> str:
         if self.remote_name == None:
@@ -141,17 +124,17 @@ class RemoteBox(IBox):
     def overload(self) -> int:
         return QueryReader(protocol().ask(QueryMaker.overload_req(), self.client)).value()
 
-    def subscribe(self, name, function, wrapname) -> None:
-        protocol().ask(QueryMaker.function_req(name, function, wrapname), self.client)
-
     def call(self, name, *args, **kwargs) -> Any:
         return eval(QueryReader(protocol().ask(QueryMaker.call_req(name, *args, **kwargs), self.client)).value(), {}, {})
 
     def __setitem__(self, k: str, v: Any) -> None:
-        protocol().ask(QueryMaker.global_set_req(k, repr(v)), self.client)
+        t, v = get_value_query(v)
+        protocol().ask(QueryMaker.set_req(k, t, v), self.client)
 
     def __getitem__(self, k: str) -> str:
-        return eval(QueryReader(protocol().ask(QueryMaker.global_get_req(k), self.client)).value(), {}, {})
+        query = QueryReader(protocol().ask(QueryMaker.get_req(k), self.client))
+        if not 'value_type' in query or not 'value' in query: return self.logger.err("Wrong answer")
+        return eval_from_query(query['value_type'], query['value'], ({}, {}))
 
 class BoxGroup(Set[IBox]):
     def __eq__(self, o: object) -> bool:
@@ -188,7 +171,7 @@ class BoxGroup(Set[IBox]):
         for i in range(0, len(fns)):
             fn : FunctionWrapper = fns[i]
             if mode != 1:
-                boxes[i % len(boxes)].subscribe(fn.name, repr(fn), fn.wrapname)
+                boxes[i % len(boxes)][fn.name] = fn
             if mode != 0:
                 res = boxes[i % len(boxes)].call(fn.name, *fn.args(), **fn.kwargs())
                 ret.append(res)

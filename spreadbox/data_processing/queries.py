@@ -52,21 +52,17 @@ class QueryMaker:
     def overload_req() -> dict:
         return {}
 
-    @query('global_set', True)
-    def global_set_req(id : str, value : str) -> dict:
-        return {'id':id, 'value':value}
+    @query('set', True)
+    def set_req(id : str, value_type : str, value : dict) -> dict:
+        return {'id':id, 'value_type':value_type, 'value':value}
 
-    @query('global_get')
-    def global_get(id : str, value : str) -> dict:
-        return {'id':id, 'value':value}
+    @query('get')
+    def get(id : str, value_type : str, value : dict) -> dict:
+        return {'id':id, 'value_type':value_type, 'value':value}
     
-    @query('global_get', True)
-    def global_get_req(id : str) -> dict:
+    @query('get', True)
+    def get_req(id : str) -> dict:
         return {'id':id}
-
-    @query('function', True)
-    def function_req(name : str, code : str, wrapname : str = 'wrap') -> dict:
-        return {'id':name, 'value':code, 'wrapname':wrapname}
 
     @query('call', True)
     def call_req(name : str, *args, **kwargs) -> dict:
@@ -76,6 +72,11 @@ class QueryMaker:
     def call(name : str, resource : Tuple[int, str]) -> dict: #for the call result
         return {'id':name, 'value':resource}
 
+    def function(name : str, code : str, wrapname : str = 'wrap') -> dict:
+        return {'name':name, 'value':code, 'wrapname':wrapname}
+
+    def literal(data : str) -> dict:
+        return {'value':data}
 
 class QueryReader:
     def __init__(self, query : dict) -> None:
