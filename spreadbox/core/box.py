@@ -4,8 +4,8 @@ from threading import Thread
 from time import sleep
 from typing import Any, Callable, List, Set, Tuple, Union
 from queue import Queue
+from logging import Logger, getLogger
 
-from ..environment.logger import Logger
 from .function_wrapper import FunctionWrapper
 from .resource import Resource
 from ..data_processing import QueryMaker, QueryReader, eval_from_query, get_value_query
@@ -124,15 +124,15 @@ class Box(IBox, ClientManager, metaclass=MetaBox):
         elif query == 'overload':
             protocol().write(QueryMaker.overload(self.overload()), sck)
         elif query == 'get':
-            if not 'id' in query: return self.logger.err("Wrong request")
+            if not 'id' in query: return self.logger.error("Wrong request")
             t, v = get_value_query(self[query['id']])
             protocol().write(query.morph(value_type=t, value=v).query(), sck) #morphing query instead of use global_get
         elif query == 'set':
-            if not 'id' in query or not 'value_type' in query or not 'value' in query: return self.logger.err("Wrong request")
+            if not 'id' in query or not 'value_type' in query or not 'value' in query: return self.logger.error("Wrong request")
             self[query['id']] = eval_from_query(query['value_type'], query['value'], (self.envGlobals,{}))
             protocol().write(QueryMaker.ok(), sck)
         elif query == 'call':
-            if not 'id' in query or not 'args' in query or not 'kwargs' in query: return self.logger.err("Wrong request")
+            if not 'id' in query or not 'args' in query or not 'kwargs' in query: return self.logger.error("Wrong request")
             answer : Any = self.call(query['id'], *query['args'], **query['kwargs'])
             t, v = get_value_query(answer)
             protocol().write(QueryMaker.call(query['id'], t, v), sck)
@@ -176,7 +176,7 @@ class RemoteBox(IBox):
         super().__init__()
         self.client = client
         self.remote_name = None
-        self.logger = Logger("Remote::"+self.name())
+        self.logger = getLogger("Remote::"+self.name())
 
     def __del__(self):
         self.client.close()
@@ -210,7 +210,7 @@ class RemoteBox(IBox):
 
     def __getitem__(self, k: str) -> str:
         query = QueryReader(protocol().ask(QueryMaker.get_req(k), self.client))
-        if not 'value_type' in query or not 'value' in query: return self.logger.err("Wrong answer")
+        if not 'value_type' in query or not 'value' in query: return self.logger.error("Wrong answer")
         return eval_from_query(query['value_type'], query['value'], ({}, {}))
 
     def group(self) -> BoxGroup:

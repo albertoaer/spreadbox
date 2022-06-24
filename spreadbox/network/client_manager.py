@@ -1,7 +1,7 @@
 from abc import abstractmethod
-from time import sleep
 from typing import Dict, Tuple
-from ..environment import Stoppable, Logger
+from logging import Logger, getLogger
+from ..environment import Stoppable
 from .protocol import ISocket, Address, protocol
 from threading import Thread
 
@@ -12,7 +12,7 @@ class ClientManager(Stoppable):
         self.clients : Dict[Address, Tuple[ISocket,Thread]] = {}
         self.server : ISocket = None
         self.thread : Thread = None
-        self.logger : Logger = Logger(id or "Server")
+        self.logger : Logger = getLogger(id or "Server")
 
     def stopServer(self):
         self.running = False

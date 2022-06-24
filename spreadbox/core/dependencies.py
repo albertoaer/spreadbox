@@ -1,7 +1,7 @@
 from types import FunctionType, ModuleType
 from typing import List, Tuple
 from dataclasses import dataclass
-from ..environment import Logger
+from logging import Logger, getLogger
 
 @dataclass
 class Dependency:
@@ -33,7 +33,7 @@ class Dependencies(List[Dependency]):
 class DependencySolver:
     @staticmethod
     def solve(fn : FunctionType) -> Dependencies:
-        logger = Logger('DependencySolver')
+        logger = getLogger('DependencySolver')
         res = Dependencies()
         for k, v in fn.__globals__.items():
             if k != "__builtins__":
