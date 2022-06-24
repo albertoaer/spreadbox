@@ -1,10 +1,11 @@
 from __future__ import annotations
-import functools
 from types import FunctionType, ModuleType
 from typing import Any, Dict, List, Tuple, Union
 import inspect
 
 class FunctionWrapper:
+    __slots__ = ('fn','name','src','libs','preparation')
+
     def __init__(self, fn : FunctionType, src : str = None, libs : set[str] = None) -> None:
         self.fn = fn
         self.name = fn.__name__
@@ -38,7 +39,7 @@ class FunctionWrapper:
 
 def wrap():
     def wrapped(fn):
-        wrapper = functools.wraps(fn)(FunctionWrapper(fn))
+        wrapper = FunctionWrapper(fn)
         return wrapper
     return wrapped
 
@@ -46,7 +47,7 @@ def wrap():
 def arg_wrap(src : str = None, libs : set[str] = None):
     def wrap():
         def wrapped(fn):
-            wrapper = functools.wraps(fn)(FunctionWrapper(fn, src, libs))
+            wrapper = FunctionWrapper(fn, src, libs)
             return wrapper
         return wrapped
     return wrap
