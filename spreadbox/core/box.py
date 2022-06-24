@@ -4,14 +4,13 @@ from threading import Thread
 from time import sleep
 from typing import Any, Callable, List, Set, Tuple, Union
 from queue import Queue
-from logging import Logger, getLogger
+from logging import getLogger
 
 from .function_wrapper import FunctionWrapper
 from .resource import Resource
 from ..data_processing import QueryMaker, QueryReader, eval_from_query, get_value_query
 from ..network.protocol import ISocket, protocol
 from ..network.client_manager import ClientManager
-from ..network.utils import netMap, ip
 
 class IBox(metaclass=ABCMeta):
     @abstractmethod
@@ -143,33 +142,6 @@ class Box(IBox, ClientManager, metaclass=MetaBox):
             val = self.resource(query['id'], query['delete'])
             t, v = get_value_query(val)
             protocol().write(QueryMaker.resource(query['id'], t, v), sck)
-    
-    @staticmethod
-    def get(addr : str, port : int, timeout : float = 1) -> Union[RemoteBox, None]:
-        res = netMap([(addr, port)], timeout)
-        return RemoteBox(res[0]) if res else None
-    
-    @staticmethod
-    def seek(addr : Union[str, Tuple[str]], port : Union[int, Tuple[int]], matchs_per_second : int = 1000) -> BoxGroup:
-        group = BoxGroup()
-        addrs = addr
-        if isinstance(addr, str):
-            addrs = [addr]
-        if isinstance(port, tuple) and len(addrs) != len(port):
-            raise Exception('Expecting same number of addresses and ports')
-        for sck in netMap(list(zip(addrs, port) if isinstance(port, tuple) else map(lambda a: (a, port), addrs)), 1/matchs_per_second):
-            group.add(RemoteBox(sck))
-        return group if group else None #avoid return empty group to prevent never ended tasks
-
-    @staticmethod
-    def network(port : int, filter : Callable[[str],bool] = None, matchs_per_second : int = 1000) -> BoxGroup:
-        #only valid for IPV4
-        thisip = ip()[-1]
-        modableip = '.'.join(thisip.split('.')[0:-1]) + "."
-        group = Box.seek([modableip + str(num) for num in range(0, 256)], port, matchs_per_second)
-        if filter and group:
-            group.filter(filter)
-        return group
 
 class RemoteBox(IBox):
     def __init__(self, client : ISocket) -> None:
