@@ -3,7 +3,7 @@ from abc import ABC, abstractmethod
 import threading
 from typing import Any, Callable, List, Set, Tuple, Union
 from .function_wrapper import FunctionWrapper
-from .queries import QueryMaker
+from .queries import QueryMaker, QueryReader
 from ..network.protocol import ISocket, protocol
 from ..network.client_manager import ClientManager
 from ..network.utils import netMap, ip
@@ -65,7 +65,14 @@ class Box(IBox, ClientManager):
         return self.envGlobals[k]
 
     def managerMessage(self, message: dict, sck: ISocket):
-        protocol().write({'name':self.name()}, sck)
+        query = QueryReader(message)
+        if query == 'name':
+            protocol().write(QueryMaker.name(self.name()), sck)
+        elif query == 'global':
+            if 'id' in query:
+                protocol().write(query.morph(value=self[query['id']]).query(), sck)
+            else:
+                pass #TODO: Log bad request
 
     def serve(self, port : int): #allow remote devices connect and use the box
         if self.server != None:
@@ -105,7 +112,7 @@ class RemoteBox(IBox):
 
     def name(self):
         if self.remote_name == None:
-            self.remote_name = protocol().askFor('name', self.client)['name']
+            self.remote_name = QueryReader(protocol().ask(QueryMaker.name_req(), self.client)).value()
         return self.remote_name
 
     def subscribe(self, name, function):
@@ -118,7 +125,7 @@ class RemoteBox(IBox):
         pass
 
     def __getitem__(self, k: str) -> Any:
-        return protocol().askFor('global:${k}', self.client)
+        return QueryReader(protocol().ask(QueryMaker.global_req(k), self.client)).value()
 
 class BoxGroup(Set[Box]):
     def __eq__(self, o: object) -> bool:
@@ -135,6 +142,12 @@ class BoxGroup(Set[Box]):
 
     def __str__(self) -> str:
         return "BoxGroup{%s}" % ', '.join([box.name() for box in self])
+
+    def members(self) -> dict[str, Box]:
+        result : dict[str, Box] = {}
+        for x in self:
+            result[x.name()] = x
+        return result
 
     def spread(self, function : Union[FunctionWrapper, List[FunctionWrapper]]):
         pass

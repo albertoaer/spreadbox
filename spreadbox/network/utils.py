@@ -13,7 +13,7 @@ def makeClient(addr : Tuple[str, int], timeout: float) -> ISocket:
     sck.intoConnection(addr)
     return sck
 
-def netMap(addrs : List[Tuple[str, int]], timeout: float = 0.001) -> List[socket.socket]:
+def netMap(addrs : List[Tuple[str, int]], timeout: float = 0.001) -> List[ISocket]:
     list : List[socket.socket] = []
     for addr in addrs:
         try:

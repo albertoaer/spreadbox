@@ -12,11 +12,12 @@ def factorial(x : int):
 def server():
     box = MyBox()
     print(box.name())
+    box['xd'] = 'something'
     box.serve(303)
 
 def client():
     available = Box.network(303)
-    print(available)
+    print(list(available)[0]['xd'])
     #factorial.spread(available)
 
 if __name__ == "__main__":
