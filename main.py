@@ -15,8 +15,8 @@ def factorial(x : int):
 def server():
     box = MyBox()
     box2 = MyBox()
-    box.serve(303, True)
-    box2.serve(304, True)
+    box.serve(303, False)
+    box2.serve(304, False)
 
 def client():
     available = Box.seek((ip()[-1],ip()[-1]), (303,304))

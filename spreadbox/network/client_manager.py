@@ -16,12 +16,12 @@ class ClientManager(Stoppable):
     def stopServer(self):
         self.running = False
 
-    def runFor(self, server : ISocket):
+    def run(self):
         self.running = True
         while self.running:
             client : ISocket
             try:
-                client = server.accept()
+                client = self.server.accept()
             except:
                 self.running = False
             else:
@@ -36,13 +36,13 @@ class ClientManager(Stoppable):
                 self.managerMessage(data, con)
             else: sleep(0.001)
 
-    def serve(self, port : int, prevail : bool = False) -> None: #create a service that manage users
+    def serve(self, port : int, prevail : bool = True) -> None: #create a service that manage users
         if self.server != None:
             raise "Already served"
         self.server = protocol().createSocket()
         self.server.intoServer(port)
         #Thread configuration and execution
-        self.thread = Thread(target=self.runFor, args=(self.server,), daemon=prevail)
+        self.thread = Thread(target=self.run, daemon=not prevail)
         self.thread.start()
     
     def stop(self) -> None:
