@@ -42,6 +42,21 @@ class TCPSocket(ISocket): #TCP Socket uses TCP connections
             nSocket.intoConnection(self.addr)
         return nSocket
 
+    def write(self, payload : dict) -> None:
+        msg = json.dumps(payload)
+        self.socket.sendall(bytearray(msg, 'utf-8'))
+
+    def read(self, size : int = 1024) -> Union[dict, None]:
+        try:
+            msg = self.socket.recv(size)
+            return None if not msg else json.loads(msg)
+        except socket.error:
+            return None
+
+    def ask(self, payload : dict) -> dict:
+        self.write(payload)
+        return self.read()
+
 @use_protocol
 class TCPProtocol(Protocol): #Default TCP Protocol uses TCP Sockets and protocol, besides it uses json format as data format
     def __init__(self) -> None:
@@ -52,21 +67,3 @@ class TCPProtocol(Protocol): #Default TCP Protocol uses TCP Sockets and protocol
 
     def wrapSocket(self, sck : socket.socket, addr: Address = None) -> ISocket:
         return TCPSocket(self, sck, addr)
-
-    def write(self, payload : dict, sck : ISocket) -> None:
-        msg = json.dumps(payload)
-        sck.socket.sendall(bytearray(msg, 'utf-8'))
-
-    def read(self, sck : ISocket, size : int = 1024) -> Union[dict, None]:
-        try:
-            msg = sck.socket.recv(size)
-            return None if not msg else json.loads(msg)
-        except socket.error:
-            return None
-
-    def ask(self, payload : dict, sck : ISocket) -> dict:
-        self.write(payload, sck)
-        return self.read(sck)
-
-    def close(self, sck : ISocket) -> None:
-        sck.socket.close()

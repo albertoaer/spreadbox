@@ -31,9 +31,9 @@ class ClientManager(Stoppable):
                 self.clients[client.addr] = (client, thread)
                 thread.start()
 
-    def attachClient(self, con : ISocket):
+    def attachClient(self, con: ISocket):
         while self.running:
-            data = protocol().read(con)
+            data = con.read()
             if data:
                 self.handleMessage(data, con)
             else:

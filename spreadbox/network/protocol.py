@@ -41,18 +41,6 @@ class ISocket(ABC):
     def migrate(self, base : Union[ISocket, None] = None) -> Union[ISocket, None]:
         return None #if returns None, its not implemented
 
-class Protocol(ABC):
-    def __init__(self, name : str) -> None:
-        self.name = name
-
-    @abstractmethod
-    def createSocket(self) -> ISocket:
-        pass
-
-    @abstractmethod
-    def wrapSocket(self, sck : socket.socket, addr: Address = None) -> ISocket:
-        pass
-
     @abstractmethod
     def write(self, payload : dict, sck : ISocket) -> None:
         pass
@@ -65,8 +53,16 @@ class Protocol(ABC):
     def ask(self, payload : dict, sck : ISocket) -> dict: #Ask sends a payload and awaits its answer
         pass
 
+class Protocol(ABC):
+    def __init__(self, name : str) -> None:
+        self.name = name
+
     @abstractmethod
-    def close(self, sck : ISocket) -> None:
+    def createSocket(self) -> ISocket:
+        pass
+
+    @abstractmethod
+    def wrapSocket(self, sck : socket.socket, addr: Address = None) -> ISocket:
         pass
 
 active_protocol : Protocol = None
