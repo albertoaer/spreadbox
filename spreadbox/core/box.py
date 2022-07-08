@@ -1,75 +1,16 @@
 from __future__ import annotations
-from abc import ABCMeta, abstractmethod
 from threading import Thread
 from time import sleep
-from typing import Any, Callable, List, Set, Tuple, Union
+from typing import Any, Tuple
 from queue import Queue
 from logging import getLogger
 
-from .function_wrapper import FunctionWrapper
+from .ibox import IBox, MetaBox
 from .resource import Resource
+from .boxgroup import BoxGroup
 from ..data_processing import QueryMaker, QueryReader, eval_from_query, get_value_query
 from ..network.protocol import ISocket, protocol
 from ..network.client_manager import ClientManager
-
-class IBox(metaclass=ABCMeta):
-    @abstractmethod
-    def name(self) -> str:
-        pass
-
-    @abstractmethod
-    def on(self) -> bool:
-        pass
-
-    @abstractmethod
-    def overload(self) -> int:
-        pass
-
-    @abstractmethod
-    def call(self, name: str, *args, **kwargs) -> Any:
-        pass
-
-    @abstractmethod
-    def callasync(self, name: str, *args, **kwargs) -> Resource:
-        pass
-
-    @abstractmethod
-    def resource(self, id : int, delete : bool) -> Any:
-        pass
-
-    @abstractmethod
-    def __setitem__(self, k: str, v: Any) -> None:
-        pass
-
-    @abstractmethod
-    def __getitem__(self, k: str) -> str:
-        pass
-
-    def __hash__(self) -> int:
-        return hash(self.name()) #hash only the name
-
-    #if the names are equals they are the same besides maybe they are not
-    #because on the network can not be two boxes with the same name
-    def __eq__(self, o: object) -> bool:
-        if not isinstance(o, Box): return False
-        return self.name() == o.name()
-
-def shared(use_self : bool = False):
-    def shared_obj(obj : Any) -> Any: #Allows properties be accessed from the outside
-        obj.__is_shared__ = True
-        obj.__use_self__ = use_self
-        return obj
-    return shared_obj
-
-class MetaBox(ABCMeta):
-    def __call__(cls, *args, **kwargs):
-        #Includes all the shared elements into the shared methods dictionary
-        cls.shared_methods = {}
-        for id in dir(cls):
-            attr = getattr(cls, id)
-            if hasattr(attr, '__is_shared__') and attr.__is_shared__:
-                cls.shared_methods[id] = attr
-        return super().__call__(*args, **kwargs)
 
 class Box(IBox, ClientManager, metaclass=MetaBox):
     def __init__(self) -> None:
@@ -172,7 +113,7 @@ class RemoteBox(IBox):
         query = QueryReader(protocol().ask(QueryMaker.callasync_req(name, *args, **kwargs), self.client))
         return Resource(query['value'], self)
 
-    def resource(self, id : int, delete : bool) -> Any:
+    def resource(self, id: int, delete: bool) -> Any:
         ans = QueryReader(protocol().ask(QueryMaker.resource_req(id, delete), self.client))
         return eval_from_query(ans['value_type'], ans['value'], ({}, {}))
 
@@ -187,63 +128,3 @@ class RemoteBox(IBox):
 
     def group(self) -> BoxGroup:
         return BoxGroup({self})
-
-class BoxGroup(Set[IBox]):
-    def __eq__(self, o: object) -> bool:
-        if o == None and len(self) == 0: return True #empty group is equals to void group
-        return super().__eq__(o)
-    
-    def filter(self, fn : Callable[[str],bool]) -> None:
-        ln = set()
-        for x in self:
-            if not fn(x.name()):
-                ln.add(x)
-        self -= ln
-
-    def __str__(self) -> str:
-        return "BoxGroup{%s}" % ', '.join([box.name() for box in self])
-
-    def members(self) -> dict[str, Box]:
-        result : dict[str, Box] = {}
-        for x in self:
-            result[x.name()] = x
-        return result
-
-    def set(self, **kwargs):
-        for k, v in kwargs.items():
-            for x in self:
-                x[k] = v
-
-    def call(self, name: str, *args, **kwargs) -> Union[Any, List[Any]]:
-        res = []
-        for x in self:
-            res.append(x.call(name, *args, **kwargs))
-        return res[0] if len(res) == 1 else res
-
-    def callasync(self, name: str, *args, **kwargs) -> Union[Resource, List[Resource]]:
-        res = []
-        for x in self:
-            res.append(x.callasync(name, *args, **kwargs))
-        return res[0] if len(res) == 1 else res
-
-    def spread(self, function : Union[FunctionWrapper, List[FunctionWrapper]], mode : int = 2) -> Union[Any, List[Any], None]: #mode may be 0(subscription), 1(call), 2(both)
-        mode %= 3
-        fns : List[FunctionWrapper] = function
-        if isinstance(function, FunctionWrapper):
-            fns = [function]
-        boxes : List[IBox] = [box for box in list(self) if box.on()]
-        if len(boxes) == 0:
-            raise Exception('No boxes available')
-        boxes = sorted(boxes, key=lambda e : e.overload())
-        ret : List[Any] = []
-        for i in range(0, len(fns)):
-            fn : FunctionWrapper = fns[i]
-            if mode != 1:
-                boxes[i % len(boxes)][fn.name] = fn
-            if mode != 0:
-                res = boxes[i % len(boxes)].call(fn.name, *fn.args(), **fn.kwargs())
-                ret.append(res)
-        if mode != 0:
-            if isinstance(function, FunctionWrapper):
-                    return ret[0]
-            return ret
