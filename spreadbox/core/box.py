@@ -107,27 +107,29 @@ class RemoteBox(IBox):
     def __del__(self):
         self.client.close()
 
+    def __call(self, name: str, do_async: bool, *args, **kwargs):
+        req: dict = QueryMaker.callasync_req(name, *args, **kwargs) if do_async else QueryMaker.call_req(name, *args, **kwargs)
+        query =  QueryReader(self.client.ask(req))
+        if do_async:
+            return Resource(query['value'], self)
+        return eval_from_query(query['value_type'], query['value'], ({}, {}))
+
     def name(self) -> str:
         if not self.remote_name:
-            query = QueryReader(self.client.ask(QueryMaker.call_req('name')))
-            self.remote_name = eval_from_query(query['value_type'], query['value'], ({}, {}))
+            self.remote_name = self.__call('name', False)
         return self.remote_name
 
     def on(self) -> bool:
-        query = QueryReader(self.client.ask(QueryMaker.call_req('on')))
-        return eval_from_query(query['value_type'], query['value'], ({}, {}))
+        return self.__call('on', False)
 
     def overload(self) -> int:
-        query = QueryReader(self.client.ask(QueryMaker.call_req('overload')))
-        return eval_from_query(query['value_type'], query['value'], ({}, {}))
+        return self.__call('overload', False)
 
     def call(self, name: str, *args, **kwargs) -> Any:
-        query = QueryReader(self.client.ask(QueryMaker.call_req(name, *args, **kwargs)))
-        return eval_from_query(query['value_type'], query['value'], ({}, {}))
+        return self.__call(name, False, *args, **kwargs)
 
     def callasync(self, name: str, *args, **kwargs) -> Resource:
-        query = QueryReader(self.client.ask(QueryMaker.callasync_req(name, *args, **kwargs)))
-        return Resource(query['value'], self)
+        return self.__call(name, True, *args, **kwargs)
 
     def resource(self, id: int, delete: bool) -> Any:
         ans = QueryReader(self.client.ask(QueryMaker.resource_req(id, delete)))
