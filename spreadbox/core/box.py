@@ -9,20 +9,20 @@ from .ibox import IBox, MetaBox
 from .resource import Resource
 from .boxgroup import BoxGroup
 from ..data_transport import QueryMaker, QueryReader, eval_from_query, get_value_query
-from ..network.protocol import ISocket, protocol
+from ..network.protocol import ISocket
 from ..network.client_manager import ClientManager
 
-class Box(IBox, ClientManager, metaclass=MetaBox):
+class Box(IBox, metaclass=MetaBox):
     def __init__(self) -> None:
         self.connections : dict[str, ISocket] = {}
-        self.envGlobals : dict[str, Any] = self.shared_methods
+        self.env_globals : dict[str, Any] = self.shared_methods
         self.idcounter : int = 0
         self.resources : dict[int, Tuple[Thread, Queue]] = {}
-        super().__init__("%s::%s" % (type(self).__name__, self.name()))
+        self.server : ServedBox = None
 
     def call(self, name: str, *args, **kwargs) -> Any:
         try:
-            fn = self.envGlobals[name]
+            fn = self.env_globals[name]
             use_self = hasattr(fn, '__use_self__') and fn.__use_self__
             return fn(*args, **kwargs) if not use_self else fn(self, *args, **kwargs)
         except Exception as e:
@@ -50,39 +50,52 @@ class Box(IBox, ClientManager, metaclass=MetaBox):
         return None
 
     def __setitem__(self, k: str, v: Any) -> None:
-        self.envGlobals[k] = v
+        self.env_globals[k] = v
 
     def __getitem__(self, k: str) -> str:
-        return self.envGlobals[k]
+        return self.env_globals[k]
+
+    def serve(self, port: int, prevail: bool = True) -> None:
+        if self.server: raise Exception('Box already served')
+        self.server = ServedBox(self, "%s::%s" % (type(self).__name__, self.name()))
+        self.server.serve(port, prevail)
+
+class ServedBox(ClientManager):
+    def __init__(self, target: Box, id: str = None) -> None:
+        super().__init__(id)
+        self.target: Box = target
+
+    def handle_get(self, query: QueryReader, sck: ISocket):
+        if not 'id' in query: return self.logger.error("Wrong request")
+        t, v = get_value_query(self.target[query['id']])
+        sck.write(query.morph(value_type=t, value=v).query()) #morphing query instead of use global_get
+
+    def handle_set(self, query: QueryReader, sck: ISocket):
+        if not 'id' in query or not 'value_type' in query or not 'value' in query: return self.logger.error("Wrong request")
+        self.target[query['id']] = eval_from_query(query['value_type'], query['value'], (self.target.env_globals,{}))
+        sck.write(QueryMaker.ok())
+
+    def handle_call(self, query: QueryReader, sck: ISocket):
+        if not 'id' in query or not 'args' in query or not 'kwargs' in query: return self.logger.error("Wrong request")
+        answer : Any = self.target.call(query['id'], *query['args'], **query['kwargs'])
+        t, v = get_value_query(answer)
+        sck.write(QueryMaker.call(query['id'], t, v))
+
+    def handle_callasync(self, query: QueryReader, sck: ISocket):
+        res = self.target.callasync(query['id'], *query['args'], **query['kwargs'])
+        sck.write(QueryMaker.callasync(query['id'], res.resource))
+
+    def handle_resource(self, query: QueryReader, sck: ISocket):
+        val = self.target.resource(query['id'], query['delete'])
+        t, v = get_value_query(val)
+        sck.write(QueryMaker.resource(query['id'], t, v))
 
     def handle_message(self, message: dict, sck: ISocket):
         query = QueryReader(message)
-        if query == 'name':
-            sck.write(QueryMaker.name(self.name()))
-        elif query == 'on':
-            sck.write(QueryMaker.on(self.on()))
-        elif query == 'overload':
-            sck.write(QueryMaker.overload(self.overload()))
-        elif query == 'get':
-            if not 'id' in query: return self.logger.error("Wrong request")
-            t, v = get_value_query(self[query['id']])
-            sck.write(query.morph(value_type=t, value=v).query()) #morphing query instead of use global_get
-        elif query == 'set':
-            if not 'id' in query or not 'value_type' in query or not 'value' in query: return self.logger.error("Wrong request")
-            self[query['id']] = eval_from_query(query['value_type'], query['value'], (self.envGlobals,{}))
-            sck.write(QueryMaker.ok())
-        elif query == 'call':
-            if not 'id' in query or not 'args' in query or not 'kwargs' in query: return self.logger.error("Wrong request")
-            answer : Any = self.call(query['id'], *query['args'], **query['kwargs'])
-            t, v = get_value_query(answer)
-            sck.write(QueryMaker.call(query['id'], t, v))
-        elif query == 'callasync':
-            res = self.callasync(query['id'], *query['args'], **query['kwargs'])
-            sck.write(QueryMaker.callasync(query['id'], res.resource))
-        elif query == 'resource':
-            val = self.resource(query['id'], query['delete'])
-            t, v = get_value_query(val)
-            sck.write(QueryMaker.resource(query['id'], t, v))
+        method = query.typename()
+        m = getattr(ServedBox, f'handle_{method}')
+        if m:
+            m(self, query, sck)
 
 class RemoteBox(IBox):
     def __init__(self, client : ISocket) -> None:
@@ -95,15 +108,18 @@ class RemoteBox(IBox):
         self.client.close()
 
     def name(self) -> str:
-        if self.remote_name == None:
-            self.remote_name = QueryReader(self.client.ask(QueryMaker.name_req())).value()
+        if not self.remote_name:
+            query = QueryReader(self.client.ask(QueryMaker.call_req('name')))
+            self.remote_name = eval_from_query(query['value_type'], query['value'], ({}, {}))
         return self.remote_name
 
     def on(self) -> bool:
-        return QueryReader(self.client.ask(QueryMaker.on_req())).value()
+        query = QueryReader(self.client.ask(QueryMaker.call_req('on')))
+        return eval_from_query(query['value_type'], query['value'], ({}, {}))
 
     def overload(self) -> int:
-        return QueryReader(self.client.ask(QueryMaker.overload_req())).value()
+        query = QueryReader(self.client.ask(QueryMaker.call_req('overload')))
+        return eval_from_query(query['value_type'], query['value'], ({}, {}))
 
     def call(self, name: str, *args, **kwargs) -> Any:
         query = QueryReader(self.client.ask(QueryMaker.call_req(name, *args, **kwargs)))

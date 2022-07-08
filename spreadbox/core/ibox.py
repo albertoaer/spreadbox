@@ -55,8 +55,13 @@ class MetaBox(ABCMeta):
     def __call__(cls, *args, **kwargs):
         #Includes all the shared elements into the shared methods dictionary
         cls.shared_methods = {}
+        share_by_default = ['name', 'on', 'overload']
         for id in dir(cls):
-            attr = getattr(cls, id)
-            if hasattr(attr, '__is_shared__') and attr.__is_shared__:
-                cls.shared_methods[id] = attr
+            fn = getattr(cls, id)
+            if id in share_by_default:
+                cls.shared_methods[id] = fn
+                setattr(fn, '__use_self__', True)
+                cls.shared_methods[id] = fn
+            elif hasattr(fn, '__is_shared__') and fn.__is_shared__:
+                cls.shared_methods[id] = fn
         return super().__call__(*args, **kwargs)

@@ -27,30 +27,6 @@ class QueryMaker:
     @query('ok')
     def ok() -> dict:
         return {}
-    
-    @query('name')
-    def name(name : str) -> dict:
-        return {'value':name}
-
-    @query('name')
-    def name_req() -> dict:
-        return {}
-    
-    @query('on')
-    def on(on : bool) -> dict:
-        return {'value':on}
-
-    @query('on')
-    def on_req() -> dict:
-        return {}
-
-    @query('overload')
-    def overload(state : int) -> dict:
-        return {'value':state}
-
-    @query('overload')
-    def overload_req() -> dict:
-        return {}
 
     @query('set', True)
     def set_req(id : str, value_type : str, value : dict) -> dict:
@@ -100,7 +76,7 @@ class QueryReader:
 
     def __eq__(self, o: object) -> bool:
         if isinstance(o, str):
-            return self.__query['type'] == o
+            return self.typename() == o
         return super().__eq__(o)
 
     def __contains__(self, item : str) -> bool:
@@ -108,6 +84,9 @@ class QueryReader:
 
     def __getitem__(self, item : str) -> str:
         return self.__query[item]
+
+    def typename(self) -> str:
+        return self.__query['type']
 
     def value(self) -> str:
         return self.__query['value']
