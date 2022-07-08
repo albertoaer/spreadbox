@@ -8,7 +8,7 @@ from logging import getLogger
 from .ibox import IBox, MetaBox
 from .resource import Resource
 from .boxgroup import BoxGroup
-from ..data_processing import QueryMaker, QueryReader, eval_from_query, get_value_query
+from ..data_transport import QueryMaker, QueryReader, eval_from_query, get_value_query
 from ..network.protocol import ISocket, protocol
 from ..network.client_manager import ClientManager
 
