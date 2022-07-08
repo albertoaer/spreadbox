@@ -45,9 +45,9 @@ def get_net_addresses(ip : str, mask : str) -> Iterator[str]:
                 yield ".".join(map(str, cloneip))
 
 def make_client(addr : Tuple[str, int], timeout : float) -> ISocket:
-    sck = protocol().createSocket()
+    sck = protocol().create_socket()
     sck.time(timeout)
-    sck.intoConnection(addr)
+    sck.into_connection(addr)
     return sck
 
 def net_map(addrs : List[Tuple[str, int]], timeout : float = 0.001) -> List[ISocket]:

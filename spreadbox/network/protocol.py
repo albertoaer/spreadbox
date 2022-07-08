@@ -18,11 +18,11 @@ class ISocket(ABC):
         self.addr = addr
 
     @abstractmethod
-    def intoServer(self, port : int) -> None:
+    def into_server(self, port : int) -> None:
         pass
 
     @abstractmethod
-    def intoConnection(self, addr : Address) -> None:
+    def into_connection(self, addr : Address) -> None:
         pass
 
     @abstractmethod
@@ -58,11 +58,11 @@ class Protocol(ABC):
         self.name = name
 
     @abstractmethod
-    def createSocket(self) -> ISocket:
+    def create_socket(self) -> ISocket:
         pass
 
     @abstractmethod
-    def wrapSocket(self, sck : socket.socket, addr: Address = None) -> ISocket:
+    def wrap_socket(self, sck : socket.socket, addr: Address = None) -> ISocket:
         pass
 
 active_protocol : Protocol = None

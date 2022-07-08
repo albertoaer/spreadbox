@@ -55,7 +55,7 @@ class Box(IBox, ClientManager, metaclass=MetaBox):
     def __getitem__(self, k: str) -> str:
         return self.envGlobals[k]
 
-    def handleMessage(self, message: dict, sck: ISocket):
+    def handle_message(self, message: dict, sck: ISocket):
         query = QueryReader(message)
         if query == 'name':
             sck.write(QueryMaker.name(self.name()))

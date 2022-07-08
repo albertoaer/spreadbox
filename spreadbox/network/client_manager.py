@@ -14,7 +14,7 @@ class ClientManager(Stoppable):
         self.thread : Thread = None
         self.logger : Logger = getLogger(id or "Server")
 
-    def stopServer(self):
+    def stop_server(self):
         self.running = False
 
     def run(self):
@@ -27,15 +27,15 @@ class ClientManager(Stoppable):
             except:
                 self.running = False
             else:
-                thread = Thread(target=self.attachClient, args=(client,))
+                thread = Thread(target=self.attach_client, args=(client,))
                 self.clients[client.addr] = (client, thread)
                 thread.start()
 
-    def attachClient(self, con: ISocket):
+    def attach_client(self, con: ISocket):
         while self.running:
             data = con.read()
             if data:
-                self.handleMessage(data, con)
+                self.handle_message(data, con)
             else:
                 break #If no data is read the client must be gone
         del self.clients[con.addr]
@@ -43,8 +43,8 @@ class ClientManager(Stoppable):
     def serve(self, port : int, prevail : bool = True) -> None: #create a service that manage users
         if self.server != None:
             raise Exception('Already served')
-        self.server = protocol().createSocket()
-        self.server.intoServer(port)
+        self.server = protocol().create_socket()
+        self.server.into_server(port)
         #Thread configuration and execution
         self.thread = Thread(target=self.run, daemon=not prevail)
         self.thread.start()
@@ -53,9 +53,9 @@ class ClientManager(Stoppable):
         if self.server != None:
             self.server.close()
         if self.thread != None:
-            self.stopServer()
+            self.stop_server()
             self.thread.join()
 
     @abstractmethod
-    def handleMessage(self, message: dict, sck : ISocket):
+    def handle_message(self, message: dict, sck : ISocket):
         pass

@@ -1,5 +1,5 @@
 import socket
-from typing import Tuple, Union
+from typing import Union
 from .utils import ip
 from .protocol import Protocol, ISocket, SocketRole, Address, use_protocol
 import json
@@ -10,14 +10,14 @@ class TCPSocket(ISocket): #TCP Socket uses TCP connections
         self.backlog = 5
         self.role : SocketRole = SocketRole.Undefined
 
-    def intoServer(self, port : int) -> None:
+    def into_server(self, port : int) -> None:
         if self.role != SocketRole.Undefined: raise Exception('Expecting unassigned socket')
         self.socket.bind((ip()[-1], port))
         self.port = port
         self.socket.listen(self.backlog)
         self.role = SocketRole.Server
 
-    def intoConnection(self, addr : Address) -> None:
+    def into_connection(self, addr : Address) -> None:
         if self.role != SocketRole.Undefined: raise Exception('Expecting unassigned socket')
         self.addr = addr
         self.socket.connect(addr)
@@ -34,12 +34,12 @@ class TCPSocket(ISocket): #TCP Socket uses TCP connections
         self.socket.close()
 
     def migrate(self, base : Union[ISocket, None] = None) -> Union[ISocket, None]:
-        nSocket = base or self.protocol.createSocket()
+        nSocket = base or self.protocol.create_socket()
         self.protocol.close(self)
         if self.role == SocketRole.Server:
-            nSocket.intoServer(self.port)
+            nSocket.into_server(self.port)
         elif self.role == SocketRole.Client:
-            nSocket.intoConnection(self.addr)
+            nSocket.into_connection(self.addr)
         return nSocket
 
     def write(self, payload : dict) -> None:
@@ -62,8 +62,8 @@ class TCPProtocol(Protocol): #Default TCP Protocol uses TCP Sockets and protocol
     def __init__(self) -> None:
         super().__init__('tcp')
 
-    def createSocket(self) -> ISocket:
+    def create_socket(self) -> ISocket:
         return TCPSocket(self, socket.socket(socket.AF_INET, socket.SOCK_STREAM))
 
-    def wrapSocket(self, sck : socket.socket, addr: Address = None) -> ISocket:
+    def wrap_socket(self, sck : socket.socket, addr: Address = None) -> ISocket:
         return TCPSocket(self, sck, addr)
