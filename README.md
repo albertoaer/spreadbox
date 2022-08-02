@@ -1,5 +1,10 @@
 # SpreadBox
 
+# Archived!
+
+- Due to poor serialization system and bad approach the project has been abandoned
+- The new one project is [Betterbox](https://github.com/albertoaer/betterbox), check it out 😀
+
 ## What is SpreadBox?
 SpreadBox is a set of tools to share and run python code among a distributed group of systems
 
